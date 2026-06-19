@@ -1,0 +1,11 @@
+table,tr,td,th {
+    border: 1px;
+    border-style: solid;
+}
+
+tbody tr:hover {
+    background-color: yellow;
+    font-style: italic;
+}
+th { background-color: #4a7c2f ;color: white}
+p {background-color: #d4a017;color: black}

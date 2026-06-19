@@ -1,0 +1,21 @@
+<students>
+<student>
+<id>987456</id>
+<name> Marie Curie </name>
+<birthday>7/11/1867</birthday>
+<gender> Woman </gender>
+</student>
+<student>
+<id>987561</id>
+<name> Einstein </name>
+<birthday>14/3/1879</birthday>
+<gender>Man</gender>
+</student>
+<student>
+<id>985467</id>
+<name> Leó Szilárd </name>
+<birthday>11/2/1898</birthday>
+<gender> Man </gender>
+</student>
+</students>
+

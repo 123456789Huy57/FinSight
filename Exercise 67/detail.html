@@ -1,0 +1,24 @@
+<html>
+    <head>
+        <title>Tiêu đề trang</title>
+        <style>
+            @import url(css/maincss.css);
+        </style>
+        <script src="js/mainjs.js"></script>
+    </head>
+    <body>
+        <table id="tbldetail">
+            <thead>
+                <tr>
+                    <th colspan="2">Student Information</th>
+                </tr>
+            </thead>
+            <tbody id="bodydetail">
+            </tbody>
+        </table>
+        <script>
+            var bodydetail=document.getElementById("bodydetail")
+            load_detail(bodydetail)
+        </script>
+    </body>
+</html>

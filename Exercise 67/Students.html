@@ -1,0 +1,32 @@
+<html>
+    <head>
+        <title> Tiêu đề trang</title>
+        <script src="js/mainjs.js"></script>
+        <style>
+            @import url(css/maincss.css);
+        </style>
+    </head>
+    <body>
+         <table id="tb1students" border="1">
+            <thead>
+                <tr>
+                    <th colspan="4" ><p> List of Students</p></th>
+                </tr>
+                <tr>
+                    <th onclick="sort_table(0)"> Student ID</th>
+                    <th onclick="sort_table(1)"> Student Name</th>
+                    <th onclick="sort_table(2)"> Student Birthday</th>
+                    <th onclick="sort_table(3)"> Student Gender</th>
+                </tr>
+            </thead>
+            <tbody id="bodystudent">
+
+            </tbody>
+        </table>
+        <script>
+            var dataset_path="dataset/students.xml"
+            var bodystudent=document.getElementById("bodystudent")
+            load_students_fromxml(dataset_path,bodystudent)
+        </script>
+    </body>
+</html>
