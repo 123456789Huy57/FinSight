@@ -1,0 +1,201 @@
+@import 'tailwindcss';
+
+@theme {
+  /* === Base surfaces — deep navy premium === */
+  --color-background:        #070d1a;
+  --color-foreground:        #e8edf5;
+  --color-card:              #0e1726;
+  --color-card-foreground:   #e8edf5;
+
+  /* === Primary — Periwinkle Blue (softer than raw blue-500) === */
+  --color-primary:           #4f8ef7;
+  --color-primary-hover:     #3b7ef6;
+  --color-primary-foreground:#ffffff;
+  --color-primary-muted:     rgba(79, 142, 247, 0.12);
+
+  /* === Secondary/Accent — same blue === */
+  --color-secondary:         #4f8ef7;
+  --color-secondary-foreground: #ffffff;
+  --color-accent:            #4f8ef7;
+  --color-accent-foreground: #ffffff;
+  --color-accent-muted:      rgba(79, 142, 247, 0.10);
+
+  /* === Success — Emerald (softer than #34d399) === */
+  --color-success:           #34d399;
+  --color-success-foreground:#052e16;
+  --color-success-muted:     rgba(52, 211, 153, 0.10);
+
+  /* === Destructive — Rose (softer than #f87171) === */
+  --color-destructive:       #f87171;
+  --color-destructive-foreground: #ffffff;
+  --color-destructive-muted: rgba(248, 113, 113, 0.10);
+
+  /* === Warning — Amber === */
+  --color-warning:           #fbbf24;
+  --color-warning-foreground:#1c1400;
+
+  /* === Info — Cyan === */
+  --color-info:              #22d3ee;
+  --color-info-foreground:   #031217;
+
+  /* === Surfaces — navy-based === */
+  --color-muted:             #1a2744;
+  --color-muted-foreground:  #7a8ba8;
+  --color-border:            #1a2744;
+  --color-border-glow:       rgba(79, 142, 247, 0.15);
+  --color-border-subtle:     #0f1f3d;
+  --color-input:             #0e1726;
+  --color-ring:              #4f8ef7;
+
+  /* === Surface layers === */
+  --color-surface-elevated:  #0e1726;
+  --color-surface-hover:     #141f33;
+  --color-section-bg:        #060c18;
+
+  /* === Ticker === */
+  --color-ticker-bg:         #060c18;
+
+  /* === Mono font === */
+  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ── Reset ──────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--color-background);
+  background-image:
+    radial-gradient(ellipse 80% 45% at 10% 0%,  rgba(79,142,247,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 30% at 90% 5%,  rgba(79,142,247,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 20% at 50% 100%, rgba(79,142,247,0.04) 0%, transparent 50%);
+  color: var(--color-foreground);
+  font-feature-settings: 'cv02','cv03','cv04','cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+main { min-height: calc(100vh - 64px); }
+
+/* ── Panels ─────────────────────────────────── */
+.panel-shell {
+  background: var(--color-card);
+  border: 1px solid rgba(79, 142, 247, 0.14);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.03) inset;
+}
+
+.panel-shell-elevated {
+  background: var(--color-surface-elevated);
+  border: 1px solid rgba(79, 142, 247, 0.18);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+
+.hero-shell {
+  background: linear-gradient(135deg,
+    rgba(79,142,247,0.12) 0%,
+    rgba(79,142,247,0.05) 50%,
+    var(--color-card) 100%);
+  border: 1px solid rgba(79,142,247,0.22);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+
+/* ── Scrollbar ──────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #1e3158; }
+
+/* ── Tabular numbers ────────────────────────── */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* ── Ticker animation — smooth 60fps ───────── */
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-animate {
+  animation: ticker-scroll 60s linear infinite;
+  will-change: transform;
+}
+.ticker-animate:hover { animation-play-state: paused; }
+
+/* ── Slide-in panel ─────────────────────────── */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.slide-in-right { animation: slide-in-right 0.22s cubic-bezier(0.16,1,0.3,1); }
+
+/* ── Fade-up entry ──────────────────────────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 0.25s cubic-bezier(0.16,1,0.3,1); }
+
+/* ── Live dot pulse ─────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+.live-dot { animation: pulse-dot 2.2s ease-in-out infinite; }
+
+/* ── Color helpers ──────────────────────────── */
+.text-up   { color: var(--color-success); }
+.text-down { color: var(--color-destructive); }
+.bg-up     { background-color: var(--color-success-muted); }
+.bg-down   { background-color: var(--color-destructive-muted); }
+
+/* ── Table data row ─────────────────────────── */
+.data-row {
+  border-bottom: 1px solid var(--color-border-subtle);
+  transition: background 0.1s;
+}
+.data-row:hover { background: var(--color-surface-hover); }
+
+/* ── Shimmer skeleton ───────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.skeleton-pulse {
+  background: linear-gradient(
+    90deg,
+    var(--color-muted) 25%,
+    #162038 50%,
+    var(--color-muted) 75%
+  );
+  background-size: 400px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+/* ── Focus ring ─────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Value flash animation (price updates) ── */
+@keyframes flash-up {
+  0%   { background-color: rgba(52,211,153,0.18); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-down {
+  0%   { background-color: rgba(248,113,113,0.18); }
+  100% { background-color: transparent; }
+}
+.flash-up   { animation: flash-up   0.6s ease-out; }
+.flash-down { animation: flash-down 0.6s ease-out; }
+
+/* ── Blue-glow card border — use on key panels ── */
+.border-glow {
+  border-color: rgba(79, 142, 247, 0.18);
+}
+.border-glow:hover {
+  border-color: rgba(79, 142, 247, 0.28);
+}
