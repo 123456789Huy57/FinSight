@@ -1,10 +1,9 @@
 services:
   - type: web
-    name: finsight-backend
+    name: finsight
     runtime: docker
-    rootDir: backend
     dockerfilePath: ./Dockerfile
-    healthCheckPath: /health
+    healthCheckPath: /
     envVars:
       - key: OPENROUTER_API_KEY
         sync: false

@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+frontend/node_modules
+backend/venv
+backend/.vnstock_home
+backend/__pycache__
+backend/services/__pycache__
+*.log
+.env
+frontend/.env.local
