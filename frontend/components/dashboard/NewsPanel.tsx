@@ -8,8 +8,8 @@ import { Skeleton } from '@/components/shared/Skeleton'
 import { classifyImpact, formatNewsTime } from '@/components/news/NewsCard'
 
 const IMPACT_STYLE = {
-  positive: 'bg-[#34d399]/8 text-[#34d399] border-[#34d399]/20',
-  negative: 'bg-[#f87171]/8 text-[#f87171] border-[#f87171]/20',
+  positive: 'bg-primary/10 text-primary border-primary/25',
+  negative: 'bg-[#fbbf24]/10 text-[#fbbf24] border-[#fbbf24]/25',
   watch:    'bg-[#f59e0b]/8 text-[#f59e0b] border-[#f59e0b]/20',
   neutral:  'bg-[#1a2744] text-[#7a8ba8] border-[#1e3158]',
 }

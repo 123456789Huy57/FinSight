@@ -7,10 +7,12 @@ import type { MarketMover, AIExplainRequest } from '@/lib/api'
 import { ExplainButton } from '@/components/shared/ExplainButton'
 import { TableRowSkeleton } from '@/components/shared/Skeleton'
 
-function fmtPrice(v: number) {
+function fmtPrice(v: number | null) {
+  if (v == null) return '-'
   return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
-function fmtVol(v: number) {
+function fmtVol(v: number | null) {
+  if (v == null) return '-'
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
   if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`
   return `${v}`
@@ -21,8 +23,9 @@ function MoverRow({ stock, showVol = false, onExplain }: {
   showVol?: boolean
   onExplain: (req: AIExplainRequest) => void
 }) {
-  const up = stock.percent_change >= 0
-  const pctAbs = Math.abs(stock.percent_change)
+  const up = (stock.percent_change ?? 0) >= 0
+  const pctAbs = stock.percent_change == null ? 0 : Math.abs(stock.percent_change)
+  const changeColor = stock.percent_change == null ? 'text-[#7a8ba8]' : up ? 'text-[#34d399]' : 'text-[#f87171]'
 
   return (
     <div className="flex items-center justify-between px-3.5 py-2.5 hover:bg-[#0e1726] transition-colors group">
@@ -36,7 +39,7 @@ function MoverRow({ stock, showVol = false, onExplain }: {
         <ExplainButton
           onClick={() => onExplain({
             type: 'stock', title: stock.symbol, symbol: stock.symbol,
-            context: `Giá: ${fmtPrice(stock.current_price)}, Biến động: ${stock.percent_change >= 0 ? '+' : ''}${stock.percent_change.toFixed(2)}%, KL: ${fmtVol(stock.volume)}`,
+            context: `Giá: ${fmtPrice(stock.current_price)}, Biến động: ${stock.percent_change == null ? 'không có dữ liệu' : `${stock.percent_change >= 0 ? '+' : ''}${stock.percent_change.toFixed(2)}%`}, KL: ${fmtVol(stock.volume)}`,
             snapshot: { symbol: stock.symbol, exchange: stock.exchange, current_price: stock.current_price, price_change: stock.price_change, percent_change: stock.percent_change, volume: stock.volume },
           })}
         />
@@ -49,10 +52,10 @@ function MoverRow({ stock, showVol = false, onExplain }: {
         )}
         <span className={[
           'text-[12px] font-bold tabular min-w-[52px] text-right',
-          up ? 'text-[#34d399]' : 'text-[#f87171]',
+          changeColor,
           pctAbs >= 3 ? 'font-black' : '',
         ].join(' ')}>
-          {up ? '+' : ''}{stock.percent_change.toFixed(2)}%
+          {stock.percent_change == null ? '-' : `${up ? '+' : ''}${stock.percent_change.toFixed(2)}%`}
         </span>
       </div>
     </div>

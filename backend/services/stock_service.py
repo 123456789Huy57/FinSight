@@ -1,6 +1,4 @@
-import os
 from datetime import datetime, timedelta, time as dtime
-from pathlib import Path
 from typing import Any, Iterable
 
 import pandas as pd
@@ -11,17 +9,7 @@ try:
 except Exception:  # pragma: no cover - fallback if tzdata missing
     _VN_TZ = None
 
-VNSTOCK_LOCAL_HOME = Path(__file__).resolve().parents[1] / ".vnstock_home"
-VNSTOCK_LOCAL_HOME.mkdir(parents=True, exist_ok=True)
-os.environ["HOME"] = str(VNSTOCK_LOCAL_HOME)
-os.environ["USERPROFILE"] = str(VNSTOCK_LOCAL_HOME)
-os.environ["VNSTOCK_HOME"] = str(VNSTOCK_LOCAL_HOME)
-os.environ["MPLCONFIGDIR"] = str(VNSTOCK_LOCAL_HOME / "matplotlib")
-Path(os.environ["MPLCONFIGDIR"]).mkdir(parents=True, exist_ok=True)
-
-from vnstock import Listing, Trading
-from vnstock.api.quote import Quote
-
+from providers.factory import get_market_provider
 from services.news_service import fetch_news_items
 
 
@@ -49,30 +37,26 @@ top_movers_cache = MarketCache(ttl_seconds=15)
 market_snapshot_cache = MarketCache(ttl_seconds=15)
 indices_cache = MarketCache(ttl_seconds=15)
 universe_cache = MarketCache(ttl_seconds=24 * 60 * 60)
+symbol_directory_cache = MarketCache(ttl_seconds=24 * 60 * 60)
 
 # Per-symbol OHLCV history cache: keyed by "SYMBOL:days", 15-minute TTL
 _HISTORY_CACHE: dict[str, tuple[datetime, "pd.DataFrame"]] = {}
 _HISTORY_TTL = timedelta(minutes=15)
 
-# Curated universe: VN30 + key liquid stocks (~60 symbols, 1-2 API batches)
-# Avoids fetching 1000+ symbols which triggers vnai rate limit on free tier
-CURATED_UNIVERSE = [
-    # VN30 core
-    "VCB","BID","CTG","TCB","MBB","VPB","ACB","HDB","STB","LPB","TPB","SSB",
-    "VHM","VIC","VRE","BCM",
-    "MSN","MWG","SAB","GVR",
-    "HPG","GAS","PLX","POW","REE",
-    "FPT","CMG",
-    "SSI","VND","HCM","VCI","BSI","ORS",
-    # Key HNX / UPCOM
-    "NVL","PDR","DXG","KDH","NLG","DXS",
-    "HSG","NKG","DGC","GEX","VGC",
-    "GMD","HAH","AST","VSC",
-    "PVD","PVS","GAS",
-    "PNJ","FRT","DGW",
-    "HNG","ELC","VGI",
-]
-CURATED_UNIVERSE = list(dict.fromkeys(CURATED_UNIVERSE))  # deduplicate
+def get_symbol_directory() -> pd.DataFrame:
+    cached = symbol_directory_cache.get()
+    if cached is not None:
+        return cached.copy()
+    frame = get_market_provider().list_symbols()
+    if frame is None or frame.empty:
+        raise RuntimeError("Configured provider returned no symbols")
+    frame = frame.copy()
+    if "name" not in frame and "organ_name" in frame:
+        frame = frame.rename(columns={"organ_name": "name"})
+    if "sector" not in frame:
+        frame["sector"] = None
+    symbol_directory_cache.set(frame)
+    return frame.copy()
 
 
 def get_symbol_universe() -> tuple[list[str], dict[str, str]]:
@@ -85,8 +69,7 @@ def get_symbol_universe() -> tuple[list[str], dict[str, str]]:
     cached = universe_cache.get()
     if cached:
         return cached
-    listing = Listing()
-    frame = listing.symbols_by_exchange()
+    frame = get_symbol_directory()
     if frame is None or frame.empty:
         raise RuntimeError("vnstock Listing returned no symbols")
     symbol_col = next((c for c in ["symbol", "ticker", "code"] if c in frame.columns), None)
@@ -164,21 +147,6 @@ SECTOR_MAP = {
     "AST": "Vận tải & Logistics",
 }
 
-DEMO_INDEX_SEED = [
-    {"symbol": "VNINDEX", "exchange": "HOSE", "points": 1352.04, "change": 5.21, "percent_change": 0.39, "volume": 650852162, "updated_at": "2025-06-19T07:00:00"},
-    {"symbol": "VN30",    "exchange": "HOSE", "points": 1398.70, "change": 4.15, "percent_change": 0.30, "volume": 320000000, "updated_at": "2025-06-19T07:00:00"},
-    {"symbol": "HNX30",   "exchange": "HNX",  "points": 298.55,  "change": 1.12, "percent_change": 0.38, "volume": 65000000,  "updated_at": "2025-06-19T07:00:00"},
-    {"symbol": "UPCOMINDEX", "exchange": "UPCOM", "points": 93.20, "change": 0.35, "percent_change": 0.38, "volume": 38000000, "updated_at": "2025-06-19T07:00:00"},
-]
-
-DEMO_QUOTE_SEED = {
-    "VCB": {"symbol": "VCB", "exchange": "HOSE", "current_price": 61700, "price_change": 100, "percent_change": 0.16, "volume": 4869000, "updated_at": "2025-06-19T09:15:00"},
-    "FPT": {"symbol": "FPT", "exchange": "HOSE", "current_price": 71500, "price_change": -100, "percent_change": -0.14, "volume": 2100000, "updated_at": "2025-06-19T09:15:00"},
-    "HPG": {"symbol": "HPG", "exchange": "HOSE", "current_price": 23600, "price_change": -50, "percent_change": -0.21, "volume": 12000000, "updated_at": "2025-06-19T09:15:00"},
-    "MWG": {"symbol": "MWG", "exchange": "HOSE", "current_price": 55000, "price_change": 500, "percent_change": 0.92, "volume": 2800000, "updated_at": "2025-06-19T09:15:00"},
-    "SSI": {"symbol": "SSI", "exchange": "HOSE", "current_price": 28500, "price_change": 300, "percent_change": 1.06, "volume": 5400000, "updated_at": "2025-06-19T09:15:00"},
-}
-
 DEMO_MOVER_SEED = [
     {"symbol": "VCB", "exchange": "HOSE", "current_price": 61700,  "price_change": 100,   "percent_change": 0.16,  "volume": 4869000},
     {"symbol": "FPT", "exchange": "HOSE", "current_price": 71500,  "price_change": -100,  "percent_change": -0.14, "volume": 2100000},
@@ -206,7 +174,7 @@ def _get_market_snapshot():
         return cached
 
     try:
-        board = Trading(source="KBS")
+        provider = get_market_provider()
         all_stocks = []
 
         symbols, exchange_map = get_symbol_universe()
@@ -215,7 +183,7 @@ def _get_market_snapshot():
         for i in range(0, len(symbols), batch_size):
             batch = symbols[i:i + batch_size]
             try:
-                df = board.price_board(batch)
+                df = provider.get_quote_snapshot(batch)
                 if df is not None and not df.empty:
                     all_stocks.append(df)
             except Exception:
@@ -225,6 +193,15 @@ def _get_market_snapshot():
             return {"error": "vnstock price board returned no market data"}
 
         combined_df = pd.concat(all_stocks, ignore_index=True)
+        directory = get_symbol_directory()
+        if "symbol" in directory.columns:
+            directory["symbol"] = directory["symbol"].astype(str).str.upper()
+            sectors = directory.drop_duplicates("symbol").set_index("symbol").get("sector", pd.Series(dtype=object))
+            exchange_by_symbol = directory.drop_duplicates("symbol").set_index("symbol").get("exchange", pd.Series(dtype=object))
+            codes = combined_df["symbol"].astype(str).str.upper()
+            combined_df["sector"] = codes.map(sectors)
+            if "exchange" not in combined_df:
+                combined_df["exchange"] = codes.map(exchange_by_symbol)
         combined_df["percent_change_num"] = _coerce_numeric_series(combined_df, ["percent_change"])
         combined_df["price_change_num"] = _coerce_numeric_series(combined_df, ["price_change", "change"])
         combined_df["price_num"] = _coerce_numeric_series(combined_df, ["close_price", "match_price", "price"])
@@ -257,10 +234,8 @@ def get_stock_history(symbol: str, days: int = 365):
 
     end_dt = datetime.now()
     start_dt = end_dt - timedelta(days=days)
-    q = Quote(symbol=symbol, source="VCI")
-    df = q.history(
-        start=start_dt.strftime("%Y-%m-%d"),
-        end=end_dt.strftime("%Y-%m-%d"),
+    df = get_market_provider().get_ohlcv(
+        symbol.upper(), start_dt.date(), end_dt.date(), interval="1D"
     )
     if df is not None and not df.empty:
         _HISTORY_CACHE[cache_key] = (datetime.now(), df)
@@ -338,8 +313,7 @@ def get_stock_profile(symbol: str) -> dict:
     try:
         now = datetime.now()
         if LISTING_CACHE is None or LISTING_CACHE_TS is None or (now - LISTING_CACHE_TS).seconds > 3600:
-            listing = Listing()
-            df_list = listing.symbols_by_exchange()
+            df_list = get_market_provider().list_symbols()
             if df_list is not None and not df_list.empty:
                 LISTING_CACHE = df_list
                 LISTING_CACHE_TS = now
@@ -357,7 +331,14 @@ def get_stock_profile(symbol: str) -> dict:
     except Exception:
         pass
 
-    sector = SECTOR_MAP.get(symbol)
+    sector = None
+    try:
+        directory = get_symbol_directory()
+        match = directory.loc[directory["symbol"].astype(str).str.upper() == symbol]
+        if not match.empty and pd.notna(match.iloc[0].get("sector")):
+            sector = str(match.iloc[0].get("sector"))
+    except Exception:
+        pass
 
     week52_high = None
     week52_low = None
@@ -410,8 +391,7 @@ def get_search_results(query: str, limit: int = 10) -> dict:
     try:
         now = datetime.now()
         if LISTING_CACHE is None or LISTING_CACHE_TS is None or (now - LISTING_CACHE_TS).seconds > 3600:
-            listing = Listing()
-            df = listing.symbols_by_exchange()
+            df = get_market_provider().list_symbols()
             if df is not None and not df.empty:
                 LISTING_CACHE = df
                 LISTING_CACHE_TS = now
@@ -448,37 +428,7 @@ def get_search_results(query: str, limit: int = 10) -> dict:
     except Exception:
         pass
 
-    # Fallback: search SECTOR_MAP
-    matches = [s for s in SECTOR_MAP if s.startswith(query)]
-    return {
-        "results": [
-            {"symbol": s, "name": "", "exchange": "HOSE"}
-            for s in matches[:limit]
-        ]
-    }
-
-
-def _demo_indices_response() -> dict:
-    return {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "indices": DEMO_INDEX_SEED,
-    }
-
-
-def _demo_quote(symbol: str) -> dict | None:
-    symbol = symbol.upper()
-    if symbol in DEMO_QUOTE_SEED:
-        return DEMO_QUOTE_SEED[symbol]
-    return None
-
-
-def _demo_market_snapshot() -> dict:
-    df = pd.DataFrame(DEMO_MOVER_SEED)
-    df["percent_change_num"] = pd.to_numeric(df["percent_change"], errors="coerce")
-    df["price_change_num"] = pd.to_numeric(df["price_change"], errors="coerce")
-    df["price_num"] = pd.to_numeric(df["current_price"], errors="coerce")
-    df["volume_num"] = pd.to_numeric(df["volume"], errors="coerce")
-    return {"updated_at": datetime.now().isoformat(), "df": df}
+    return {"results": []}
 
 
 def convert_numpy_to_python(value):
@@ -571,15 +521,14 @@ def get_quote(symbol: str) -> dict:
     """Get realtime stock quote with proper JSON serialization"""
     symbol = symbol.upper()
     try:
-        board = Trading(source="KBS")
-        df = board.price_board([symbol])
+        df = get_market_provider().get_quote_snapshot([symbol])
         if df is None or df.empty:
             return {"error": f"Symbol {symbol} not found"}
 
         row = df.iloc[0]
         timestamp = _normalize_timestamp(_get_first_existing(row, ["time", "timestamp", "updated_at", "received_time"]))
 
-        current_price = _find_first_numeric(row, ["match_price", "close_price", "price", "last_price"])
+        current_price = _find_first_numeric(row, ["current_price", "match_price", "close_price", "price", "last_price"])
         price_change = _find_first_numeric(row, ["price_change", "change", "match_price_change"])
         percent_change = _find_first_numeric(row, ["percent_change", "price_change_pct", "change_pct"])
         volume = _safe_int(_get_first_existing(row, ["volume_accumulated", "volume_last", "match_volume", "volume"]))
@@ -606,19 +555,14 @@ def get_quote(symbol: str) -> dict:
         if current_price is None:
             return {"error": f"Symbol {symbol} not found"}
 
-        if price_change is None:
-            price_change = 0.0
-        if percent_change is None:
-            percent_change = 0.0
-
         return {
             "symbol": str(convert_numpy_to_python(row.get("symbol", symbol))).upper(),
-            "exchange": str(convert_numpy_to_python(row.get("exchange", "HOSE"))),
+            "exchange": convert_numpy_to_python(row.get("exchange")),
             "current_price": round(float(current_price), 2),
-            "price_change": round(float(price_change), 2),
-            "percent_change": round(float(percent_change), 2),
+            "price_change": round(float(price_change), 2) if price_change is not None else None,
+            "percent_change": round(float(percent_change), 2) if percent_change is not None else None,
             "volume": volume,
-            "updated_at": timestamp or datetime.now().isoformat(),
+            "updated_at": timestamp,
         }
 
     except Exception as e:
@@ -722,22 +666,6 @@ def get_most_active(limit: int = 10) -> dict:
         }
     except Exception as e:
         return {"error": str(e), "stocks": []}
-        demo_snapshot = _demo_market_snapshot()
-        df = demo_snapshot["df"].sort_values("volume_num", ascending=False).head(limit)
-        return {
-            "updated_at": demo_snapshot["updated_at"],
-            "stocks": [
-                {
-                    "symbol": str(convert_numpy_to_python(row.get("symbol", ""))).upper(),
-                    "exchange": convert_numpy_to_python(row.get("exchange")),
-                    "current_price": round(float(row["price_num"]), 2) if pd.notna(row.get("price_num")) else None,
-                    "price_change": round(float(row["price_change_num"]), 2) if pd.notna(row.get("price_change_num")) else None,
-                    "percent_change": round(float(row["percent_change_num"]), 2) if pd.notna(row.get("percent_change_num")) else None,
-                    "volume": _safe_int(row.get("volume_num")),
-                }
-                for _, row in df.iterrows()
-            ],
-        }
 
 
 def get_screener_data() -> dict:
@@ -748,7 +676,8 @@ def get_screener_data() -> dict:
             return snapshot
 
         df = snapshot["df"].copy()
-        df["sector"] = df["symbol"].astype(str).str.upper().map(SECTOR_MAP).fillna("Khác")
+        if "sector" not in df:
+            df["sector"] = None
 
         stocks = []
         for _, row in df.iterrows():
@@ -762,7 +691,7 @@ def get_screener_data() -> dict:
             stocks.append({
                 "symbol": sym,
                 "exchange": str(convert_numpy_to_python(row.get("exchange", "HOSE"))),
-                "sector": str(row.get("sector", "Khác")),
+                "sector": str(row["sector"]) if pd.notna(row.get("sector")) else None,
                 "current_price": round(float(price), 2) if pd.notna(price) else None,
                 "price_change": round(float(change), 2) if pd.notna(change) else None,
                 "percent_change": round(float(pct), 2) if pd.notna(pct) else None,
@@ -785,7 +714,9 @@ def get_sector_performance(limit: int = 6) -> dict:
             return snapshot
 
         df = snapshot["df"].copy()
-        df["sector"] = df["symbol"].astype(str).str.upper().map(SECTOR_MAP).fillna("Khác")
+        if "sector" not in df:
+            df["sector"] = None
+        df = df.dropna(subset=["sector"])
         grouped = (
             df.groupby("sector", dropna=False)["percent_change_num"]
             .agg(["mean", "count"])
@@ -810,31 +741,6 @@ def get_sector_performance(limit: int = 6) -> dict:
         }
     except Exception as e:
         return {"error": str(e), "leading": [], "weak": []}
-        demo_snapshot = _demo_market_snapshot()
-        df = demo_snapshot["df"].copy()
-        df["sector"] = df["symbol"].astype(str).str.upper().map(SECTOR_MAP).fillna("Khác")
-        grouped = (
-            df.groupby("sector", dropna=False)["percent_change_num"]
-            .agg(["mean", "count"])
-            .reset_index()
-            .sort_values("mean", ascending=False)
-        )
-
-        leading = grouped.head(limit)
-        weak = grouped.sort_values("mean", ascending=True).head(limit)
-
-        def to_item(row):
-            return {
-                "name": row["sector"],
-                "percent_change": round(float(row["mean"]), 2),
-                "stocks": int(row["count"]),
-            }
-
-        return {
-            "updated_at": demo_snapshot["updated_at"],
-            "leading": [to_item(row) for _, row in leading.iterrows()],
-            "weak": [to_item(row) for _, row in weak.iterrows()],
-        }
 
 
 def _get_last_trading_date() -> datetime:
@@ -941,21 +847,18 @@ def get_news_intelligence() -> dict:
 
     top_gainer = commentary["top_gainers"][0] if commentary["top_gainers"] else {"symbol": "VNINDEX"}
     top_loser = commentary["top_losers"][0] if commentary["top_losers"] else {"symbol": "VNINDEX"}
-    leading_sector = commentary["leading_sectors"][0] if commentary["leading_sectors"] else {"name": "Market"}
 
     raw_news = fetch_news_items(limit=8)
     if not raw_news:
-        raw_news = [
-            {
-                "id": "1",
-                "headline": f"Market breadth improves as {leading_sector['name']} leads the session",
-                "source": "FinSight AI",
-                "time": "Now",
-                "summary": commentary["summary"],
-                "url": None,
-                "published_at": datetime.now().isoformat(),
-            }
-        ]
+        result = {
+            "updated_at": None,
+            "items": [],
+            "source": "rss",
+            "data_mode": "external-feed",
+            "status": "no_data",
+        }
+        _news_intelligence_cache.set(result)
+        return result
 
     def classify_story(item: dict[str, Any]) -> dict[str, Any]:
         text = f"{item.get('headline', '')} {item.get('summary', '')}".lower()
@@ -1071,21 +974,14 @@ def get_market_status() -> dict:
 
 
 def get_indices() -> dict:
-    """Get real Vietnamese market indices (VNINDEX, VN30, HNX30, UPCOMINDEX)"""
+    """Get actual index candles from the configured data provider."""
     cached = indices_cache.get()
     if cached:
         return cached
     try:
-        from vnstock import Market
-
-        market = Market()
+        provider = get_market_provider()
         indices_to_fetch = ["VNINDEX", "VN30", "HNX30", "UPCOMINDEX"]
-
-        result = {
-            "timestamp": _get_last_trading_date().strftime("%Y-%m-%d %H:%M:%S"),
-            "indices": []
-        }
-        
+        result = {"timestamp": None, "indices": []}
         def _index_label(symbol: str) -> str:
             if symbol in ["VNINDEX", "VN30"]:
                 return "HOSE"
@@ -1095,27 +991,10 @@ def get_indices() -> dict:
                 return "UPCOM"
             return "HOSE"
 
-        def _index_fallback(symbol: str) -> dict:
-            demo_map = {item["symbol"]: item for item in DEMO_INDEX_SEED}
-            demo = demo_map.get(symbol, DEMO_INDEX_SEED[0])
-            return {
-                "symbol": symbol,
-                "exchange": _index_label(symbol),
-                "points": demo["points"],
-                "change": demo["change"],
-                "percent_change": demo["percent_change"],
-                "volume": demo["volume"],
-                "updated_at": demo["updated_at"],
-            }
-
-        # Fetch last 5 trading days to ensure we always have prev vs current bar
-        end_str = datetime.now().strftime("%Y-%m-%d")
-        start_str = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-
         for index_symbol in indices_to_fetch:
             try:
-                index_obj = market.index(index_symbol)
-                df = index_obj.ohlcv(start=start_str, end=end_str)
+                end_date = datetime.now().date()
+                df = provider.get_index_history(index_symbol, end_date - timedelta(days=7), end_date)
 
                 if df is None or df.empty:
                     continue
@@ -1142,9 +1021,10 @@ def get_indices() -> dict:
                     "updated_at": updated_at,
                 })
             except Exception:
-                    continue
+                continue
 
-        final = result if result["indices"] else {"error": "vnstock returned no index data", "indices": []}
+        result["timestamp"] = max((item["updated_at"] for item in result["indices"]), default=None)
+        final = result if result["indices"] else {"error": "Provider returned no index data", "indices": []}
         indices_cache.set(final)
         return final
 
@@ -1155,15 +1035,15 @@ def get_indices() -> dict:
 def get_data_sources() -> dict:
     return {
         "market": {
-            "indices": "vnstock Market().index(...).ohlcv()",
-            "quote": "vnstock Trading(source='KBS').price_board() with history fallback",
-            "top_movers": "vnstock Trading(source='KBS').price_board() over Listing universe",
-            "breadth": "Derived from Listing universe percent_change",
-            "sectors": "Derived from Listing universe + SECTOR_MAP",
-            "most_active": "Derived from Listing universe volume",
-            "search": "vnstock Listing().symbols_by_exchange()",
+            "indices": "Configured provider index OHLCV; defaults to vnstock v5 Market.index().ohlcv()",
+            "quote": "Configured provider quote snapshot; CSV mode is synthetic demo data",
+            "top_movers": "Configured provider quote snapshot over active listed symbols",
+            "breadth": "Derived from provider quote snapshot",
+            "sectors": "Provider ICB sector directory where available",
+            "most_active": "Derived from provider quote volume",
+            "search": "Configured provider symbol directory",
         },
-        "history": "vnstock.api.quote.Quote(symbol, source='VCI').history()",
+        "history": "Configured provider daily OHLCV; vnstock v5 uses Market.equity().ohlcv()",
         "news": "RSS feeds from VnExpress and VnEconomy by default",
         "ai": {
             "commentary": "OpenRouter if OPENROUTER_API_KEY is set, otherwise deterministic fallback",

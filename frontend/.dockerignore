@@ -1,0 +1,9 @@
+.git
+.next
+.next-*
+node_modules
+out
+coverage
+.env*
+*.tsbuildinfo
+npm-debug.log*

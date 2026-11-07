@@ -35,3 +35,7 @@ Thumbs.db
 
 # Editor
 .idea/
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

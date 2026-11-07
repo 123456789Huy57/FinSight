@@ -16,7 +16,6 @@ COPY backend /app/backend
 COPY frontend /app/frontend
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
@@ -25,4 +24,7 @@ RUN cd /app/frontend && npm run build
 WORKDIR /app
 EXPOSE 3000
 
-CMD ["sh", "-c", "python3 -m uvicorn main:app --app-dir /app/backend --host 127.0.0.1 --port 8000 & exec npm --prefix /app/frontend run start"]
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]

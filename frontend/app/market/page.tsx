@@ -9,6 +9,7 @@ import { ExplainPanel } from '@/components/ai/ExplainPanel'
 import { ChatWidget } from '@/components/ai/ChatWidget'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { getScreenerData, getMarketCommentary } from '@/lib/api'
+import { formatDataAsOf } from '@/lib/format'
 import type {
   ScreenerStock,
   MarketBreadth,
@@ -135,13 +136,6 @@ function ScreenerSkeleton() {
   )
 }
 
-// ── Demo fallback ─────────────────────────────────────────────
-
-const DEMO_BREADTH: MarketBreadth = {
-  advancers: 287, decliners: 143, unchanged: 22,
-  sentiment: 'RISK-ON', status: 'Breadth 2:1',
-}
-
 // ── Page ──────────────────────────────────────────────────────
 
 export default function MarketPage() {
@@ -149,7 +143,10 @@ export default function MarketPage() {
   const [breadth,     setBreadth]     = useState<MarketBreadth | null>(null)
   const [sectors,     setSectors]     = useState<SectorPerformanceResponse | null>(null)
   const [loading,     setLoading]     = useState(true)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [error,       setError]       = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [syntheticData, setSyntheticData] = useState(false)
+  const [dataSource, setDataSource] = useState<string | null>(null)
 
   const [explainOpen, setExplainOpen] = useState(false)
   const [explainReq,  setExplainReq]  = useState<AIExplainRequest | null>(null)
@@ -164,16 +161,51 @@ export default function MarketPage() {
 
   const [sortKey, setSortKey] = useState<SortKey>('percent_change')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [filtersReady, setFiltersReady] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const queryExchange = params.get('exchange')
+    const queryChange = params.get('change') as ChangeFilter | null
+    const querySort = params.get('sort') as SortKey | null
+    const validSorts: SortKey[] = ['symbol', 'exchange', 'sector', 'current_price', 'price_change', 'percent_change', 'volume']
+    if (EXCHANGES.includes(queryExchange as ExchangeFilter)) setExchange(queryExchange as ExchangeFilter)
+    if (params.has('sector')) setSector(params.get('sector') || 'Tất cả')
+    if (queryChange && CHANGE_OPTS.some((option) => option.key === queryChange)) setChangeFilter(queryChange)
+    if (querySort && validSorts.includes(querySort)) setSortKey(querySort)
+    if (params.get('dir') === 'asc') setSortDir('asc')
+    if (params.has('q')) setSymbolQuery(params.get('q') ?? '')
+    setFiltersReady(true)
+  }, [])
+
+  useEffect(() => {
+    if (!filtersReady) return
+    const params = new URLSearchParams()
+    if (symbolQuery.trim()) params.set('q', symbolQuery.trim())
+    if (exchange !== 'Tất cả') params.set('exchange', exchange)
+    if (sector !== 'Tất cả') params.set('sector', sector)
+    if (changeFilter !== 'all') params.set('change', changeFilter)
+    if (sortKey !== 'percent_change') params.set('sort', sortKey)
+    if (sortDir !== 'desc') params.set('dir', sortDir)
+    const query = params.toString()
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+  }, [filtersReady, symbolQuery, exchange, sector, changeFilter, sortKey, sortDir])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const [screenerRes, commentaryRes] = await Promise.allSettled([
-        getScreenerData(),
+        getScreenerData({ q: symbolQuery.trim() || undefined, limit: 200 }),
         getMarketCommentary(),
       ])
-      if (screenerRes.status === 'fulfilled')
+      if (screenerRes.status === 'fulfilled') {
         setStocks(screenerRes.value.stocks)
+        setSyntheticData(screenerRes.value.data_mode === 'synthetic-demo')
+        setDataSource(screenerRes.value.source ?? null)
+      } else {
+        setError('Không tải được dữ liệu thị trường. Vui lòng thử lại.')
+      }
       if (commentaryRes.status === 'fulfilled' && commentaryRes.value) {
         const d = commentaryRes.value
         if (d.breadth) setBreadth(d.breadth)
@@ -184,13 +216,20 @@ export default function MarketPage() {
             weak:    d.weak_sectors    ?? [],
           })
       }
-      setLastUpdated(new Date())
+      if (screenerRes.status === 'fulfilled' && screenerRes.value.updated_at) {
+        const dataDate = new Date(screenerRes.value.updated_at)
+        if (!Number.isNaN(dataDate.getTime())) setLastUpdated(screenerRes.value.updated_at)
+      }
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [symbolQuery])
 
-  useEffect(() => { void fetchData() }, [fetchData])
+  useEffect(() => {
+    if (!filtersReady) return
+    const timer = window.setTimeout(() => { void fetchData() }, 250)
+    return () => window.clearTimeout(timer)
+  }, [fetchData, filtersReady])
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -211,7 +250,6 @@ export default function MarketPage() {
     if (exchange !== 'Tất cả')  list = list.filter((s) => s.exchange === exchange)
     if (sector  !== 'Tất cả')   list = list.filter((s) => s.sector   === sector)
     if (changeFilter !== 'all') list = list.filter((s) => matchChange(s.percent_change, changeFilter))
-    if (symbolQuery)            list = list.filter((s) => s.symbol.startsWith(symbolQuery.toUpperCase()))
     list.sort((a, b) => {
       const av = sortVal(a, sortKey)
       const bv = sortVal(b, sortKey)
@@ -222,11 +260,22 @@ export default function MarketPage() {
         : (bv as number) - (av as number)
     })
     return list
-  }, [stocks, exchange, sector, changeFilter, symbolQuery, sortKey, sortDir])
+  }, [stocks, exchange, sector, changeFilter, sortKey, sortDir])
 
   return (
     <>
       <div className="max-w-screen-2xl mx-auto px-4 lg:px-6 py-4">
+        {syntheticData && (
+          <div role="status" className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            Dữ liệu minh họa tổng hợp, không phải giá thị trường thật.
+          </div>
+        )}
+        {error && (
+          <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-red-200">
+            <span>{error}</span>
+            <button type="button" onClick={() => void fetchData()} className="font-semibold underline underline-offset-2">Thử lại</button>
+          </div>
+        )}
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
 
           {/* Screener panel */}
@@ -246,11 +295,12 @@ export default function MarketPage() {
                 <div className="flex items-center gap-3">
                   {lastUpdated && (
                     <span className="text-[10px] text-[#3d4f6b] hidden sm:block">
-                      {lastUpdated.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                      Phiên {formatDataAsOf(lastUpdated)}
                     </span>
                   )}
                   <button
                     type="button"
+                    aria-label="Làm mới dữ liệu thị trường"
                     onClick={() => void fetchData()}
                     disabled={loading}
                     className="p-1.5 rounded-lg text-[#7a8ba8] hover:text-foreground hover:bg-[#0e1726] transition-colors disabled:opacity-40"
@@ -269,6 +319,7 @@ export default function MarketPage() {
                     <button
                       key={ex}
                       type="button"
+                      aria-pressed={exchange === ex}
                       onClick={() => setExchange(ex)}
                       className={[
                         'text-[11px] font-semibold px-2.5 py-1 rounded-lg leading-none transition-colors',
@@ -310,6 +361,7 @@ export default function MarketPage() {
                       <button
                         key={opt.key}
                         type="button"
+                        aria-pressed={changeFilter === opt.key}
                         onClick={() => setChangeFilter(opt.key)}
                         className={[
                           'text-[11px] font-semibold px-2.5 py-1 rounded-lg leading-none transition-colors',
@@ -333,7 +385,8 @@ export default function MarketPage() {
                     type="text"
                     value={symbolQuery}
                     onChange={(e) => setSymbolQuery(e.target.value)}
-                    placeholder="Tìm mã..."
+                    aria-label="Tìm mã hoặc tên công ty"
+                    placeholder="Mã / tên..."
                     className="pl-6 pr-2 py-1 text-[11px] bg-[#0e1726] border border-[#1a2744] rounded-lg text-foreground placeholder:text-[#3d4f6b] focus:outline-none focus:ring-1 focus:ring-primary w-24 leading-none"
                   />
                 </div>
@@ -347,20 +400,23 @@ export default function MarketPage() {
                       {COLUMNS.map((col) => (
                         <th
                           key={col.key}
-                          onClick={() => toggleSort(col.key)}
+                          scope="col"
+                          aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                           className={[
                             'py-2.5 text-[11px] font-semibold uppercase tracking-wide select-none',
-                            'cursor-pointer transition-colors',
                             sortKey === col.key ? 'text-foreground' : 'text-[#3d4f6b] hover:text-[#9baac0]',
                             col.align === 'right' ? 'text-right' : 'text-left',
                             col.thClass,
                             col.mobileHide ? 'hidden sm:table-cell' : '',
                           ].join(' ')}
                         >
-                          <span className={`inline-flex items-center gap-0.5 ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
-                            {col.label}
-                            <SortIcon col={col.key} sortKey={sortKey} sortDir={sortDir} />
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleSort(col.key)}
+                            className={`inline-flex w-full items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded ${col.align === 'right' ? 'flex-row-reverse justify-start' : 'text-left'}`}
+                          >
+                            {col.label}<SortIcon col={col.key} sortKey={sortKey} sortDir={sortDir} />
+                          </button>
                         </th>
                       ))}
                     </tr>
@@ -447,6 +503,11 @@ export default function MarketPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+              <div className="border-t border-[#0f1f3d] px-4 py-2 text-[10px] text-[#7a8ba8]" aria-live="polite">
+                Nguồn: {dataSource ?? 'API FinSight'}
+                {lastUpdated && <> · Dữ liệu đến {formatDataAsOf(lastUpdated)}</>}
+                {syntheticData && ' · Dữ liệu minh họa'}
               </div>
             </div>
           </div>

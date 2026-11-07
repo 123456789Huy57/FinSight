@@ -192,6 +192,15 @@ main { min-height: calc(100vh - 64px); }
 .flash-up   { animation: flash-up   0.6s ease-out; }
 .flash-down { animation: flash-down 0.6s ease-out; }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ── Blue-glow card border — use on key panels ── */
 .border-glow {
   border-color: rgba(79, 142, 247, 0.18);

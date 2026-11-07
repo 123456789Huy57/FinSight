@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useCallback, useEffect, useState } from 'react'
+import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, RefreshCw, Building2, Star } from 'lucide-react'
 import Link from 'next/link'
 
@@ -9,22 +9,27 @@ import { ExplainPanel } from '@/components/ai/ExplainPanel'
 import { ExplainButton } from '@/components/shared/ExplainButton'
 import { ChatWidget } from '@/components/ai/ChatWidget'
 import { Skeleton } from '@/components/shared/Skeleton'
-import { getQuote, getStockHistory, getStockProfile } from '@/lib/api'
-import type { Quote, OHLCVCandle, StockProfile, AIExplainRequest } from '@/lib/api'
+import { getNewsIntelligence, getQuote, getStockHistory, getStockIndicators, getStockProfile } from '@/lib/api'
+import type { EventWindow, NewsItem, Quote, OHLCVCandle, StockIndicators, StockProfile, AIExplainRequest } from '@/lib/api'
 import { useMarketPolling } from '@/lib/useMarketPolling'
 import { MarketStatusBadge } from '@/components/shared/MarketStatusBadge'
+import { accountFetch, ACCESS_TOKEN_KEY } from '@/lib/account'
+import { formatDataAsOf } from '@/lib/format'
 
 const PERIODS: { label: string; days: number }[] = [
   { label: '1T',  days: 30  },
   { label: '3T',  days: 90  },
   { label: '6T',  days: 180 },
   { label: '1N',  days: 365 },
+  { label: '5N',  days: 1250 },
 ]
 
-function fmtPrice(v: number) {
+function fmtPrice(v: number | null) {
+  if (v == null) return '-'
   return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
-function fmtVol(v: number) {
+function fmtVol(v: number | null) {
+  if (v == null) return '-'
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`
   if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`
   return `${v}`
@@ -39,6 +44,31 @@ function StatRow({ label, value, valueClass = '' }: { label: string; value: stri
   )
 }
 
+function fmtIndicator(value: number | null | undefined, digits = 2) {
+  return value == null ? 'Chưa đủ dữ liệu' : value.toLocaleString('vi-VN', { maximumFractionDigits: digits })
+}
+
+function describeWindow(window: EventWindow, eligibleForMeasurement: boolean) {
+  if (window.status === 'measured' && eligibleForMeasurement && window.abnormalReturnPct != null) {
+    const pct = window.abnormalReturnPct
+    return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}% bất thường`
+  }
+  if (window.status === 'pending') return 'Đang chờ đủ phiên'
+  if (window.status === 'overlapping_event') return 'Cửa sổ trùng tin khác'
+  return 'Thiếu dữ liệu phù hợp'
+}
+
+function vietnamPublishTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date)
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? ''
+  return { date: `${part('year')}-${part('month')}-${part('day')}`, hour: Number(part('hour')), minute: Number(part('minute')) }
+}
+
 interface Props { params: Promise<{ symbol: string }> }
 
 export default function StockPage({ params }: Props) {
@@ -48,14 +78,35 @@ export default function StockPage({ params }: Props) {
   const [quote,        setQuote]        = useState<Quote | null>(null)
   const [profile,      setProfile]      = useState<StockProfile | null>(null)
   const [candles,      setCandles]      = useState<OHLCVCandle[]>([])
+  const [indicators,   setIndicators]   = useState<StockIndicators | null>(null)
+  const [newsItems,    setNewsItems]    = useState<NewsItem[]>([])
   const [period,       setPeriod]       = useState(180)
   const [loadingQuote, setLoadingQuote] = useState(true)
   const [loadingChart, setLoadingChart] = useState(true)
+  const [loadingIndicators, setLoadingIndicators] = useState(true)
+  const [loadingNews, setLoadingNews] = useState(true)
+  const [quoteError, setQuoteError] = useState<string | null>(null)
+  const [chartError, setChartError] = useState<string | null>(null)
+  const [indicatorsError, setIndicatorsError] = useState<string | null>(null)
+  const [newsError, setNewsError] = useState<string | null>(null)
+  const [historySource, setHistorySource] = useState<string | null>(null)
+  const [historyAsOf, setHistoryAsOf] = useState<string | null>(null)
+  const [historyDataMode, setHistoryDataMode] = useState<'synthetic-demo' | 'market-provider' | 'external-feed' | null>(null)
   const [explainOpen,  setExplainOpen]  = useState(false)
   const [explainReq,   setExplainReq]   = useState<AIExplainRequest | null>(null)
   const [inWatchlist,  setInWatchlist]  = useState(false)
 
   useEffect(() => {
+    const token = sessionStorage.getItem(ACCESS_TOKEN_KEY)
+    if (token) {
+      void accountFetch('/api/v1/watchlist', { headers: { Authorization: `Bearer ${token}` } })
+        .then(async (response) => {
+          if (!response.ok) return
+          const data = await response.json() as { items: Array<{ symbol: string }> }
+          setInWatchlist(data.items.some((item) => item.symbol === SYM))
+        }).catch(() => undefined)
+      return
+    }
     const stored = localStorage.getItem('finsight_watchlist')
     if (stored) {
       try {
@@ -65,7 +116,18 @@ export default function StockPage({ params }: Props) {
     }
   }, [SYM])
 
-  const toggleWatchlist = useCallback(() => {
+  const toggleWatchlist = useCallback(async () => {
+    const token = sessionStorage.getItem(ACCESS_TOKEN_KEY)
+    if (token) {
+      const response = await accountFetch(`/api/v1/watchlist${inWatchlist ? `/${encodeURIComponent(SYM)}` : ''}`, {
+        method: inWatchlist ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        ...(inWatchlist ? {} : { body: JSON.stringify({ symbol: SYM }) }),
+      })
+      if (!response.ok) return
+      setInWatchlist(!inWatchlist)
+      return
+    }
     const stored = localStorage.getItem('finsight_watchlist')
     let list: string[] = []
     try { list = stored ? (JSON.parse(stored) as string[]) : [] } catch { /* ignore */ }
@@ -83,10 +145,11 @@ export default function StockPage({ params }: Props) {
     if (profile?.company_name) parts.push(profile.company_name)
     parts.push(`(${SYM})`)
     if (profile?.sector) parts.push(`ngành ${profile.sector}`)
-    if (quote) {
+    if (quote?.current_price != null) {
       parts.push(`giá ${fmtPrice(quote.current_price)} VND`)
-      parts.push(`biến động ${quote.percent_change >= 0 ? '+' : ''}${quote.percent_change.toFixed(2)}%`)
-      parts.push(`KL ${fmtVol(quote.volume)}`)
+      if (quote.percent_change != null)
+        parts.push(`biến động ${quote.percent_change >= 0 ? '+' : ''}${quote.percent_change.toFixed(2)}%`)
+      if (quote.volume != null) parts.push(`KL ${fmtVol(quote.volume)}`)
     }
     handleExplain({
       type: 'stock',
@@ -111,15 +174,23 @@ export default function StockPage({ params }: Props) {
 
   const fetchQuote = useCallback(async () => {
     setLoadingQuote(true)
+    setQuoteError(null)
     try { setQuote(await getQuote(SYM)) }
-    catch { setQuote(null) }
+    catch { setQuote(null); setQuoteError(`Không tải được dữ liệu cho mã ${SYM}. Kiểm tra mã hoặc kết nối API.`) }
     finally { setLoadingQuote(false) }
   }, [SYM])
 
   const fetchChart = useCallback(async () => {
     setLoadingChart(true)
-    try { setCandles((await getStockHistory(SYM, period)).candles ?? []) }
-    catch { setCandles([]) }
+    setChartError(null)
+    try {
+      const response = await getStockHistory(SYM, period)
+      setCandles(response.candles ?? [])
+      setHistorySource(response.source ?? null)
+      setHistoryAsOf(response.updated_at ?? null)
+      setHistoryDataMode(response.data_mode ?? null)
+    }
+    catch { setCandles([]); setChartError('Không tải được lịch sử giá.') }
     finally { setLoadingChart(false) }
   }, [SYM, period])
 
@@ -128,8 +199,41 @@ export default function StockPage({ params }: Props) {
     catch { setProfile(null) }
   }, [SYM])
 
-  useEffect(() => { void fetchQuote(); void fetchProfile() }, [fetchQuote, fetchProfile])
+  const fetchIndicators = useCallback(async () => {
+    setLoadingIndicators(true)
+    setIndicatorsError(null)
+    try { setIndicators(await getStockIndicators(SYM)) }
+    catch { setIndicators(null); setIndicatorsError('Không tải được chỉ báo kỹ thuật.') }
+    finally { setLoadingIndicators(false) }
+  }, [SYM])
+
+  const fetchNews = useCallback(async () => {
+    setLoadingNews(true)
+    setNewsError(null)
+    try { setNewsItems((await getNewsIntelligence({ symbol: SYM, limit: 100 })).items ?? []) }
+    catch { setNewsItems([]); setNewsError('Không tải được tin liên quan đến mã này.') }
+    finally { setLoadingNews(false) }
+  }, [SYM])
+
+  useEffect(() => { void fetchQuote(); void fetchProfile(); void fetchIndicators(); void fetchNews() }, [fetchQuote, fetchProfile, fetchIndicators, fetchNews])
   useEffect(() => { void fetchChart() }, [fetchChart])
+
+  const newsMarkers = useMemo(() => {
+    const tradingDates = candles.map((candle) => candle.time?.slice(0, 10)).filter((value): value is string => Boolean(value))
+    const uniqueDates = [...new Set(tradingDates)].sort()
+    return newsItems.flatMap((item) => {
+      const reaction = item.reactions?.find((entry) => entry.symbol === SYM)
+      let eventDate = reaction?.eventTradeDate ?? null
+      if (!eventDate) {
+        const published = vietnamPublishTime(item.time)
+        if (!published) return []
+        const sameDayCloseEligible = published.hour < 15
+        eventDate = uniqueDates.find((date) => date > published.date || (sameDayCloseEligible && date === published.date)) ?? null
+      }
+      if (!eventDate || !uniqueDates.includes(eventDate)) return []
+      return [{ time: eventDate, title: item.headline }]
+    })
+  }, [candles, newsItems, SYM])
 
   const marketStatus = useMarketPolling(fetchQuote, 10_000)
 
@@ -137,7 +241,7 @@ export default function StockPage({ params }: Props) {
   const loading = loadingQuote
 
   const rangePosition = (() => {
-    if (!quote || profile?.week52_high == null || profile?.week52_low == null) return null
+    if (!quote || quote.current_price == null || profile?.week52_high == null || profile?.week52_low == null) return null
     const range = profile.week52_high - profile.week52_low
     if (range <= 0) return 50
     return Math.max(2, Math.min(98, ((quote.current_price - profile.week52_low) / range) * 100))
@@ -171,6 +275,17 @@ export default function StockPage({ params }: Props) {
         </div>
 
         {/* Hero card */}
+        {(quote?.data_mode === 'synthetic-demo' || historyDataMode === 'synthetic-demo') && (
+          <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            Dữ liệu minh họa tổng hợp, không phải giá thị trường thật.
+          </div>
+        )}
+        {quoteError && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-red-200">
+            <span>{quoteError}</span>
+            <button type="button" onClick={() => { void fetchQuote(); void fetchProfile() }} className="font-semibold underline underline-offset-2">Thử lại</button>
+          </div>
+        )}
         <div className={`rounded-xl bg-[#0e1726] border border-[#1a2744] p-4 sm:p-5 relative overflow-hidden ${heroAccentClass}`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
 
@@ -199,7 +314,7 @@ export default function StockPage({ params }: Props) {
                   <Skeleton className="h-9 w-36" />
                   <Skeleton className="h-4 w-24" />
                 </div>
-              ) : quote ? (
+              ) : quote?.current_price != null ? (
                 <div className="pt-1">
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-[2.2rem] leading-none font-black tabular text-foreground">
@@ -207,10 +322,12 @@ export default function StockPage({ params }: Props) {
                     </span>
                     <span className="text-[11px] font-semibold text-[#7a8ba8]">VND</span>
                   </div>
-                  <div className={`flex items-center gap-2 mt-1 ${up ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
-                    <span className="text-[14px] font-bold tabular">{up ? '+' : ''}{fmtPrice(quote.price_change)}</span>
-                    <span className="text-[14px] font-bold opacity-80">({up ? '+' : ''}{quote.percent_change.toFixed(2)}%)</span>
-                  </div>
+                  {(quote.price_change != null || quote.percent_change != null) && (
+                    <div className={`flex items-center gap-2 mt-1 ${up ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
+                      {quote.price_change != null && <span className="text-[14px] font-bold tabular">{up ? '+' : ''}{fmtPrice(quote.price_change)}</span>}
+                      {quote.percent_change != null && <span className="text-[14px] font-bold opacity-80">({up ? '+' : ''}{quote.percent_change.toFixed(2)}%)</span>}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-[13px] text-[#7a8ba8] pt-1">Không tải được dữ liệu</p>
@@ -222,7 +339,8 @@ export default function StockPage({ params }: Props) {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={toggleWatchlist}
+                  aria-pressed={inWatchlist}
+                  onClick={() => void toggleWatchlist()}
                   title={inWatchlist ? 'Xóa khỏi watchlist' : 'Thêm vào watchlist'}
                   className={[
                     'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all',
@@ -241,11 +359,14 @@ export default function StockPage({ params }: Props) {
                   <p className="text-[11px] text-[#7a8ba8]">
                     KL: <span className="font-bold text-foreground tabular">{fmtVol(quote.volume)}</span>
                   </p>
+                  <p className="mt-0.5 text-[9px] text-[#3d4f6b]">
+                    {quote.source ?? 'Nguồn chưa rõ'} · {formatDataAsOf(quote.updated_at)}
+                  </p>
                 </div>
               )}
               <button
                 type="button"
-                onClick={() => { void fetchQuote(); void fetchChart() }}
+                onClick={() => { void fetchQuote(); void fetchChart(); void fetchIndicators(); void fetchNews() }}
                 disabled={loading || loadingChart}
                 className="flex items-center gap-1.5 text-[11px] text-[#7a8ba8] hover:text-foreground transition-colors disabled:opacity-40"
               >
@@ -262,12 +383,16 @@ export default function StockPage({ params }: Props) {
           {/* Chart panel */}
           <div className="lg:col-span-2 rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] overflow-hidden shadow-lg shadow-black/50">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(79,142,247,0.12)]">
-              <span className="text-[13px] font-bold text-foreground">Biểu đồ giá</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-bold text-foreground">Biểu đồ giá</span>
+                {newsMarkers.length > 0 && <span className="text-[10px] text-primary">N · Tin liên quan</span>}
+              </div>
               <div className="flex gap-0.5">
                 {PERIODS.map(({ label, days }) => (
                   <button
                     key={label}
                     type="button"
+                    aria-pressed={period === days}
                     onClick={() => setPeriod(days)}
                     className={[
                       'px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors',
@@ -284,7 +409,10 @@ export default function StockPage({ params }: Props) {
             {loadingChart ? (
               <div className="p-4"><Skeleton className="w-full rounded-lg h-[340px]" /></div>
             ) : (
-              <CandlestickChart candles={candles} height={340} />
+              <>
+                {chartError && <p role="alert" className="px-4 pt-3 text-xs text-red-200">{chartError}</p>}
+                <CandlestickChart candles={candles} newsMarkers={newsMarkers} height={340} />
+              </>
             )}
           </div>
 
@@ -313,7 +441,7 @@ export default function StockPage({ params }: Props) {
                 />
                 <StatRow
                   label="% Biến động"
-                  value={`${up ? '+' : ''}${quote.percent_change.toFixed(2)}%`}
+                  value={quote.percent_change == null ? '-' : `${up ? '+' : ''}${quote.percent_change.toFixed(2)}%`}
                   valueClass={up ? 'text-[#34d399]' : 'text-[#f87171]'}
                 />
                 <StatRow label="Khối lượng" value={fmtVol(quote.volume)} />
@@ -323,6 +451,25 @@ export default function StockPage({ params }: Props) {
             ) : (
               <p className="text-[13px] text-[#7a8ba8] py-2">Không có dữ liệu</p>
             )}
+
+            <div className="pt-3 mt-2 border-t border-[#1a2744]">
+              <p className="text-[12px] font-bold text-foreground mb-1">Chỉ báo kỹ thuật</p>
+              {loadingIndicators ? (
+                <p className="py-2 text-[11px] text-[#7a8ba8]">Đang tải chỉ báo…</p>
+              ) : indicatorsError ? (
+                <p role="alert" className="py-2 text-[11px] text-red-200">{indicatorsError}</p>
+              ) : indicators?.indicators ? (
+                <>
+                  <StatRow label="RSI (14)" value={fmtIndicator(indicators.indicators.rsi14)} />
+                  <StatRow label="SMA (20)" value={fmtIndicator(indicators.indicators.sma20)} />
+                  <StatRow label="SMA (50)" value={fmtIndicator(indicators.indicators.sma50)} />
+                  <StatRow label="MACD histogram" value={fmtIndicator(indicators.indicators.macdHistogram, 4)} />
+                  <p className="pt-1 text-[9px] text-[#3d4f6b]">Tính từ lịch sử giá · {indicators.source ?? 'nguồn chưa rõ'} · {indicators.asOf ?? 'chưa có thời điểm'}</p>
+                </>
+              ) : (
+                <p className="py-2 text-[11px] text-[#7a8ba8]">Chưa đủ lịch sử giá để tính.</p>
+              )}
+            </div>
 
             {/* 52W range */}
             {rangePosition !== null && profile && (
@@ -356,9 +503,54 @@ export default function StockPage({ params }: Props) {
           </div>
         </div>
 
+        <section className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] overflow-hidden shadow-lg shadow-black/50" aria-labelledby="stock-news-heading">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[rgba(79,142,247,0.12)]">
+            <div>
+              <h2 id="stock-news-heading" className="text-[13px] font-bold text-foreground">Tin liên quan đến {SYM}</h2>
+              <p className="mt-0.5 text-[10px] text-[#7a8ba8]">Tin được ghim trên biểu đồ theo phiên sự kiện · RSS có ghi nguồn.</p>
+            </div>
+            {!loadingNews && <span className="text-[11px] text-[#7a8ba8]">{newsItems.length} tin</span>}
+          </div>
+          {loadingNews ? (
+            <div className="space-y-2 p-4"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
+          ) : newsError ? (
+            <p role="alert" className="px-4 py-6 text-xs text-red-200">{newsError}</p>
+          ) : newsItems.length === 0 ? (
+            <p className="px-4 py-6 text-xs text-[#7a8ba8]">Chưa có tin RSS liên quan đến {SYM}.</p>
+          ) : (
+            <ul className="divide-y divide-[#0f1f3d]">
+              {newsItems.map((item) => {
+                const reaction = item.reactions?.find((entry) => entry.symbol === SYM)
+                const eligibleForMeasurement = reaction?.dataMode === 'market-provider' && Boolean(reaction.methodVersion)
+                return (
+                  <li key={item.id} className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[#7a8ba8]">
+                      <span className="font-semibold">{item.source}</span>
+                      <span>·</span>
+                      <time dateTime={item.time}>{new Date(item.time).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</time>
+                      <span>· Sentiment heuristic</span>
+                    </div>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sm font-semibold text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
+                      {item.headline}
+                      <span className="sr-only"> (mở bài viết từ {item.source} ở tab mới)</span>
+                    </a>
+                    {reaction && (
+                      <p className="mt-1 text-[10px] text-[#7a8ba8]">
+                        Quan sát so với VN-Index · T+1: {describeWindow(reaction.t1, eligibleForMeasurement)} · T+5: {describeWindow(reaction.t5, eligibleForMeasurement)}
+                      </p>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+
         {candles.length > 0 && (
           <p className="text-[10px] text-[#3d4f6b]/60 text-center">
-            {candles.length} phiên lịch sử · nguồn VCI/TCBS qua vnstock
+            {candles.length} phiên lịch sử · Nguồn giá: {historySource ?? 'chưa rõ'}
+            {historyAsOf && ` · Dữ liệu đến ${formatDataAsOf(historyAsOf)}`}
+            {historyDataMode === 'synthetic-demo' && ' · Dữ liệu minh họa'}
           </p>
         )}
       </div>

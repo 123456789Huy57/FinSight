@@ -1,6 +1,6 @@
 'use client'
 
-import { BarChart2, TrendingUp, Newspaper, Search, X, ChevronRight, Menu } from 'lucide-react'
+import { BarChart2, TrendingUp, Newspaper, Search, X, ChevronRight, Menu, UserRound, ChartNoAxesCombined } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -15,6 +15,8 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: BarChart2 },
   { href: '/market',    label: 'Thị trường', icon: TrendingUp },
   { href: '/news',      label: 'Tin tức',    icon: Newspaper  },
+  { href: '/account',   label: 'Danh mục',   icon: UserRound  },
+  { href: '/backtest',  label: 'Backtest',   icon: ChartNoAxesCombined },
 ]
 
 export function TopNav() {
@@ -110,7 +112,7 @@ export function TopNav() {
         </nav>
 
         {/* Search */}
-        <div className="flex-1 max-w-[300px] ml-auto relative" ref={dropdownRef}>
+        <div className="flex-1 min-w-0 max-w-[300px] ml-auto relative" ref={dropdownRef}>
           <div className={[
             'flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all duration-150',
             focused

@@ -91,7 +91,7 @@ export function SectorPanel({ leading, weak, onExplain, loading }: {
   const all = [
     ...leading.map((s) => ({ ...s, direction: 'up' as const })),
     ...weak.map((s)    => ({ ...s, direction: 'down' as const })),
-  ].sort((a, b) => b.percent_change - a.percent_change)
+  ].sort((a, b) => (b.percent_change ?? Number.NEGATIVE_INFINITY) - (a.percent_change ?? Number.NEGATIVE_INFINITY))
 
   return (
     <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] overflow-hidden shadow-md shadow-black/40">
@@ -117,8 +117,9 @@ export function SectorPanel({ leading, weak, onExplain, loading }: {
               </div>
             ))
           : all.slice(0, 8).map((s) => {
-              const up = s.percent_change >= 0
-              const barW = Math.min(Math.abs(s.percent_change) * 22, 100)
+              const up = (s.percent_change ?? 0) >= 0
+              const barW = s.percent_change == null ? 0 : Math.min(Math.abs(s.percent_change) * 22, 100)
+              const valueColor = s.percent_change == null ? 'text-[#7a8ba8]' : up ? 'text-[#34d399]' : 'text-[#f87171]'
               return (
                 <div
                   key={s.name}
@@ -128,7 +129,7 @@ export function SectorPanel({ leading, weak, onExplain, loading }: {
                     type="button"
                     onClick={() => onExplain({
                       type: 'sector', title: s.name, sector: s.name,
-                      context: `Biến động: ${s.percent_change >= 0 ? '+' : ''}${s.percent_change.toFixed(2)}%, ${s.stocks} mã`,
+                      context: `Biến động: ${s.percent_change == null ? 'không có dữ liệu' : `${s.percent_change >= 0 ? '+' : ''}${s.percent_change.toFixed(2)}%`}, ${s.stocks} mã`,
                     })}
                     className="text-[12px] text-[#9baac0] group-hover:text-foreground transition-colors truncate max-w-[140px] text-left leading-none"
                   >
@@ -141,8 +142,8 @@ export function SectorPanel({ leading, weak, onExplain, loading }: {
                         style={{ width: `${barW}%` }}
                       />
                     </div>
-                    <span className={`text-[12px] font-bold tabular min-w-[48px] text-right ${up ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
-                      {up ? '+' : ''}{s.percent_change.toFixed(2)}%
+                    <span className={`text-[12px] font-bold tabular min-w-[48px] text-right ${valueColor}`}>
+                      {s.percent_change == null ? '-' : `${up ? '+' : ''}${s.percent_change.toFixed(2)}%`}
                     </span>
                   </div>
                 </div>

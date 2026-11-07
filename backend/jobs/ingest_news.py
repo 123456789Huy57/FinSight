@@ -1,0 +1,104 @@
+import asyncio
+import logging
+import re
+import uuid
+from datetime import datetime
+
+from sqlalchemy import select
+
+from core.config import settings
+from db.models import NewsArticle, NewsSymbol, Symbol
+from db.session import AsyncSessionLocal
+from domain.sentiment import score_sentiment
+from domain.text import normalize_vi
+from services.news_service import canonicalize_url, fetch_news_items, normalize_published_at, story_hash
+
+logger = logging.getLogger(__name__)
+
+CATEGORY_RULES = {
+    "regulatory": ("chính phủ", "ngân hàng nhà nước", "bộ tài chính", "quy định", "pháp lý"),
+    "economic": ("lạm phát", "gdp", "lãi suất", "tỷ giá", "kinh tế", "xuất khẩu"),
+    "stock": ("cổ phiếu", "doanh nghiệp", "công ty", "kết quả kinh doanh", "cổ đông"),
+}
+
+
+def _category(text: str) -> str:
+    normalized = normalize_vi(text)
+    for category, terms in CATEGORY_RULES.items():
+        if any(normalize_vi(term) in normalized for term in terms):
+            return category
+    return "market"
+
+
+def _related_symbols(text: str, symbols: list[tuple[str, str | None]]) -> list[str]:
+    found = []
+    upper_text = text.upper()
+    normalized_text = normalize_vi(text)
+    generic_name_suffixes = {"viet nam", "tai chinh", "ngan hang", "thuong mai"}
+    for code, name in symbols:
+        if re.search(rf"(?<![A-Z0-9]){re.escape(code)}(?![A-Z0-9])", upper_text):
+            found.append(code)
+            continue
+        if not name:
+            continue
+        normalized_name = normalize_vi(name)
+        if len(normalized_name) >= 6 and normalized_name in normalized_text:
+            found.append(code)
+            continue
+        name_parts = normalized_name.split()
+        suffix = " ".join(name_parts[-2:])
+        if len(suffix) >= 6 and suffix not in generic_name_suffixes and re.search(
+            rf"(?<![a-z0-9]){re.escape(suffix)}(?![a-z0-9])", normalized_text
+        ):
+            found.append(code)
+    return list(dict.fromkeys(found))
+
+
+async def ingest_news(limit: int = 50) -> dict[str, int]:
+    if not settings.news_feed_enabled:
+        logger.info("RSS news ingestion skipped because NEWS_FEED_ENABLED is false")
+        return {"enabled": 0, "fetched": 0, "inserted": 0, "tickerLinks": 0}
+
+    articles = await asyncio.to_thread(fetch_news_items, limit)
+    async with AsyncSessionLocal() as session:
+        listed = list((await session.execute(select(Symbol.symbol, Symbol.name).where(Symbol.is_active.is_(True)))).all())
+        symbol_pairs = [(symbol, name) for symbol, name in listed]
+        valid_symbols = {symbol for symbol, _ in listed}
+        inserted = 0
+        linked = 0
+        for item in articles:
+            title = (item.get("headline") or "").strip()
+            if not title:
+                continue
+            summary = item.get("summary") or ""
+            raw_published_at = item.get("published_at")
+            published_iso = normalize_published_at(raw_published_at)
+            published_at = datetime.fromisoformat(published_iso) if published_iso else None
+            raw_hash = story_hash(title, published_iso)
+            url = canonicalize_url(item.get("url")) or f"urn:finsight:sha256:{raw_hash}"
+            existing_id = await session.scalar(select(NewsArticle.id).where(
+                (NewsArticle.url == url) | (NewsArticle.raw_hash == raw_hash)
+            ).limit(1))
+            if existing_id:
+                article_id = existing_id
+            else:
+                score, sentiment = score_sentiment(f"{title} {summary}")
+                article_id = str(uuid.uuid4())
+                session.add(NewsArticle(
+                    id=article_id, url=url, source=item.get("source") or "Unknown",
+                    title=title[:1000], summary=summary,
+                    search_text=normalize_vi(f"{title} {summary} {item.get('source') or ''}"),
+                    published_at=published_at,
+                    category=_category(f"{title} {summary}"),
+                    sentiment=sentiment, sentiment_score=score, raw_hash=raw_hash,
+                ))
+                inserted += 1
+            tickers = set(_related_symbols(f"{title} {summary}", symbol_pairs)) & valid_symbols
+            existing_links = set((await session.scalars(
+                select(NewsSymbol.symbol).where(NewsSymbol.article_id == article_id)
+            )).all())
+            for ticker in tickers - existing_links:
+                session.add(NewsSymbol(article_id=article_id, symbol=ticker))
+                linked += 1
+        await session.commit()
+    return {"fetched": len(articles), "inserted": inserted, "tickerLinks": linked}

@@ -26,6 +26,11 @@ export function CommentaryPanel({ commentary, loading, onExplain }: CommentaryPa
         <div className="flex items-center gap-2">
           <Zap className="w-3.5 h-3.5 text-[#f59e0b]" strokeWidth={2.5} />
           <h2 className="text-[13px] font-bold text-foreground">Nhận định thị trường</h2>
+          {commentary?.method === 'rule_based_snapshot' && (
+            <span className="rounded border border-[#f59e0b]/20 bg-[#f59e0b]/5 px-1.5 py-0.5 text-[9px] font-semibold text-[#f59e0b]">
+              Tổng hợp từ dữ liệu, không phải AI
+            </span>
+          )}
         </div>
         <ExplainButton onClick={handleExplain} size="md" label="Phân tích AI" />
       </div>

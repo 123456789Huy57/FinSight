@@ -1,0 +1,3 @@
+--extra-index-url https://vnstocks.com/api/packages
+-r requirements.txt
+vnstock==5.2.1

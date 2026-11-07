@@ -2,7 +2,7 @@
 
 import { ExternalLink } from 'lucide-react'
 import Link from 'next/link'
-import type { NewsItem, AIExplainRequest } from '@/lib/api'
+import type { EventWindow, NewsItem, AIExplainRequest } from '@/lib/api'
 import { ExplainButton } from '@/components/shared/ExplainButton'
 
 export type ImpactClass = 'positive' | 'negative' | 'watch' | 'neutral'
@@ -19,8 +19,8 @@ export function classifyImpact(impact: string): ImpactClass {
 }
 
 const IMPACT_STYLE: Record<ImpactClass, string> = {
-  positive: 'bg-[#34d399]/8 text-[#34d399] border-[#34d399]/25',
-  negative: 'bg-[#f87171]/8 text-[#f87171] border-[#f87171]/25',
+  positive: 'bg-primary/10 text-primary border-primary/25',
+  negative: 'bg-[#fbbf24]/10 text-[#fbbf24] border-[#fbbf24]/25',
   watch:    'bg-[#f59e0b]/8 text-[#f59e0b] border-[#f59e0b]/25',
   neutral:  'bg-[#1a2744] text-[#7a8ba8] border-[#1e3158]',
 }
@@ -32,6 +32,17 @@ function ImpactBadge({ impact }: { impact: string }) {
       {impact}
     </span>
   )
+}
+
+function formatWindow(window: EventWindow, eligibleForMeasurement: boolean): string {
+  if (window.status === 'measured' && eligibleForMeasurement && window.abnormalReturnPct != null) {
+    const value = window.abnormalReturnPct
+    return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
+  }
+  if (window.status === 'overlapping_event') return 'Trùng cửa sổ tin'
+  if (window.status === 'insufficient_data') return 'Thiếu dữ liệu'
+  if (window.status === 'pending') return 'Chờ đủ phiên'
+  return 'Chưa đo được'
 }
 
 export function formatNewsTime(time: string): string {
@@ -72,6 +83,7 @@ export function NewsCard({ item, onExplain }: Props) {
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={`Mở bài viết từ ${item.source} (mở tab mới)`}
               onClick={(e) => e.stopPropagation()}
               className="text-[#3d4f6b] hover:text-primary transition-colors"
             >
@@ -91,6 +103,21 @@ export function NewsCard({ item, onExplain }: Props) {
         <p className="text-xs text-[#7a8ba8] leading-relaxed mb-3 line-clamp-2">
           {item.insight}
         </p>
+      )}
+
+      {(item.reactions?.length ?? 0) > 0 && (
+        <div className="mb-3 rounded-lg border border-[#1a2744] bg-[#070d1a]/60 px-3 py-2">
+          <p className="mb-1.5 text-[10px] font-semibold text-[#7a8ba8]">Phản ứng quan sát so với VN-Index · T+1 / T+5</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {item.reactions?.map((reaction) => (
+              <span key={reaction.symbol} className="text-[10px] text-[#7a8ba8]">
+                <Link href={`/stock/${reaction.symbol}`} className="font-bold text-primary hover:underline">{reaction.symbol}</Link>
+                {' · '}{formatWindow(reaction.t1, reaction.dataMode === 'market-provider' && Boolean(reaction.methodVersion))}
+                {' / '}{formatWindow(reaction.t5, reaction.dataMode === 'market-provider' && Boolean(reaction.methodVersion))}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Tickers + AI */}

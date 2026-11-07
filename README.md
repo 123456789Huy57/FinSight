@@ -1,6 +1,6 @@
 # FinSight — Vietnam Stock Market Intelligence Platform
 
-FinSight là nền tảng phân tích thị trường chứng khoán Việt Nam theo phong cách terminal tài chính. Theo dõi chỉ số thời gian thực, tra cứu cổ phiếu với biểu đồ nến, đọc tin tức được AI phân tích tác động, và đặt câu hỏi trực tiếp với trợ lý AI về thị trường.
+FinSight là ứng dụng phân tích thị trường chứng khoán Việt Nam. Dữ liệu thị trường được lấy theo nguồn cấu hình, lưu vào PostgreSQL và phục vụ qua API v1. Dự án không cam kết dữ liệu realtime.
 
 > **Tuyên bố miễn trừ trách nhiệm**: FinSight chỉ cung cấp thông tin phân tích và giải thích dữ liệu. Ứng dụng **không** đưa ra bất kỳ khuyến nghị mua hoặc bán chứng khoán nào.
 
@@ -10,12 +10,14 @@ FinSight là nền tảng phân tích thị trường chứng khoán Việt Nam 
 
 | Trang | Nội dung |
 |---|---|
-| **Dashboard** | 4 chỉ số (VNINDEX/VN30/HNX30/UPCOM), top gainers/losers, AI market commentary, news, breadth |
-| **Market Screener** | ~60 cổ phiếu với lọc theo sàn/ngành/biến động/mã, sort, live update |
+| **Dashboard** | Chỉ số, biến động, độ rộng và tin tức nếu provider đã đồng bộ dữ liệu |
+| **Market Screener** | Danh sách mã từ symbol directory trong database, lọc theo sàn/ngành/biến động |
 | **Stock Detail** | Biểu đồ nến + volume (TradingView lightweight-charts), 52W range, AI phân tích riêng từng mã |
-| **News Intelligence** | Tin tức RSS được AI phân loại tác động, lọc theo nguồn/impact, sidebar ticker mentions |
+| **News Intelligence** | Tin RSS, liên kết mã và sentiment baseline theo từ khóa tiếng Việt; không gọi heuristic là AI |
 | **AI Explain Panel** | Click bất kỳ đối tượng nào (cổ phiếu, chỉ số, tin tức, ngành) để AI giải thích chi tiết TA + FA |
 | **AI Chat** | Chatbot floating context-aware, biết đang xem trang nào |
+| **Tài khoản API** | Email/password, JWT access token và refresh cookie; watchlist/portfolio cá nhân qua `/api/v1` |
+| **Backtest API** | Buy-and-hold, DCA, SMA crossover, RSI mean reversion; lệnh khớp phiên kế tiếp, phí/thuế và lô 100 |
 
 ---
 
@@ -29,13 +31,14 @@ FinSight là nền tảng phân tích thị trường chứng khoán Việt Nam 
 
 **Backend**
 - FastAPI + Python 3.10+
-- `vnstock` 4.0.4 — dữ liệu thị trường Việt Nam (KBS/VCI)
+- Adapter provider; CSV synthetic là mặc định cho demo, vnstock chỉ là adapter local tùy chọn khi tài khoản và quyền dùng dữ liệu cho phép
+- SQLAlchemy async + Alembic + PostgreSQL; Redis tùy chọn cho cache/rate-limit
 - OpenRouter AI (`deepseek/deepseek-chat-v3.1`) — commentary và explain
 - TTL-based in-memory caching (commentary 10 min, history 15 min, news 10 min)
 
 **Infrastructure**
 - Docker + Docker Compose (one-command start)
-- Render (backend) + Vercel (frontend) cho free cloud deploy
+- Render Blueprint: một URL web cho Next.js + FastAPI; Postgres, Key Value và worker là tài nguyên backing
 
 ---
 
@@ -48,31 +51,23 @@ cd finsight
 
 # 2. Tạo file .env từ template
 cp .env.example .env
-# Điền OPENROUTER_API_KEY vào .env (tùy chọn — app chạy được không có key, dùng fallback)
+# Mặc định MARKET_PROVIDER=csv để chạy demo synthetic; AI key là tùy chọn
+# RSS VnExpress/VnEconomy được bật theo xác nhận quyền lưu/hiển thị; mỗi tin giữ attribution
 
-# 3. Start
-docker-compose up --build
+# 3. Start frontend, API, worker, PostgreSQL và Redis
+docker compose up --build
 ```
 
 - Frontend: http://localhost:3000
-- Backend API docs: http://localhost:8000/docs
+- API docs (Compose): http://localhost:8000/docs
+- Readiness (Compose): http://localhost:8000/ready
+- API v1 qua frontend: http://localhost:3000/api/v1/market/overview
 
 ---
 
 ## Chạy local 1-click trên Windows
 
-1. Bấm đúp `start-finsight.bat` ở thư mục gốc.
-2. Chờ 2 cửa sổ backend/frontend mở lên.
-3. Vào:
-   - Frontend: http://127.0.0.1:3000
-   - Backend: http://127.0.0.1:8000
-
-Muốn tắt nhanh:
-- Bấm đúp `stop-finsight.bat`
-
-Lưu ý:
-- Backend cần có `backend\venv` sẵn.
-- Frontend cần đã cài dependencies (`npm install`) ít nhất một lần.
+Khuyến nghị dùng Docker Compose để có PostgreSQL/Redis, chạy migration và seed lịch sử synthetic tự động. Các script `.bat` cũ chỉ dành cho môi trường local đã cài dependency riêng.
 
 ---
 
@@ -89,10 +84,20 @@ python -m venv venv
 source venv/bin/activate
 
 pip install -r requirements.txt
+# When running from backend/, copy the root template here so Settings loads it:
+cp ../.env.example .env
+alembic upgrade head
 uvicorn main:app --reload --port 8000
 ```
 
-> Nếu gặp lỗi vnstock, xem `backend/VNSTOCK_SETUP.md` để troubleshoot.
+Để có dữ liệu ban đầu và RSS, chạy worker ở terminal thứ hai:
+
+```bash
+cd backend
+python worker.py
+```
+
+> Worker được khởi chạy trực tiếp bằng `python worker.py` (không phải ASGI app). Nếu cần thử provider vnstock cục bộ và có quyền truy cập phù hợp, cài thêm `requirements-vnstock.txt`; xem `backend/VNSTOCK_SETUP.md`.
 
 ### Frontend
 
@@ -111,32 +116,19 @@ Truy cập http://localhost:3000.
 | Biến | Mô tả | Bắt buộc |
 |---|---|---|
 | `OPENROUTER_API_KEY` | API key từ [openrouter.ai](https://openrouter.ai) | Không (app dùng fallback nếu thiếu) |
-| `BACKEND_API_URL` | URL backend (dùng khi deploy frontend lên Vercel) | Không (mặc định `http://127.0.0.1:8000`) |
+| `BACKEND_API_URL` | Backend upstream cho Next.js proxy; unified Docker mặc định dùng localhost nội bộ | Không |
+| `DATABASE_URL` | Chuỗi kết nối PostgreSQL async | Không khi chạy bằng Compose |
+| `REDIS_URL` | Redis URL; readiness kiểm tra nếu được cấu hình | Không |
+| `MARKET_PROVIDER` | `csv` (mặc định, synthetic demo) hoặc `vnstock` (cục bộ, cần quyền truy cập phù hợp) | Không |
+| `NEWS_FEED_ENABLED` | `true` bật RSS VnExpress/VnEconomy cho API và worker; tắt bằng `false` | Không |
+| `JWT_SECRET` | Secret ký access token; production phải dùng chuỗi ngẫu nhiên riêng | Có ở production |
+| `VNSTOCK_API_KEY` | Key vnstock khi adapter cục bộ yêu cầu; không cấu hình cho public demo | Tùy chọn |
 
 ---
 
-## Deploy miễn phí lên Cloud
+## Deploy một URL trên Render
 
-### Backend → Render
-
-1. Tạo tài khoản [render.com](https://render.com), chọn **New Web Service**
-2. Kết nối GitHub repo
-3. Cấu hình:
-   - **Root Directory**: `backend`
-   - **Runtime**: Python
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-4. **Environment Variables**: thêm `OPENROUTER_API_KEY`
-5. Deploy → nhận URL backend (vd: `https://finsight-backend.onrender.com`)
-
-### Frontend → Vercel
-
-1. Tạo tài khoản [vercel.com](https://vercel.com), import GitHub repo
-2. Cấu hình:
-   - **Root Directory**: `frontend`
-   - **Framework**: Next.js
-3. **Environment Variables**: thêm `BACKEND_API_URL` = URL Render từ bước trên
-4. Deploy → hoàn tất
+`render.yaml` khai báo unified web service, worker, PostgreSQL và Key Value. Public demo mặc định dùng CSV synthetic; không bật provider thật nếu chưa xác nhận quyền truy cập, lưu trữ và hiển thị dữ liệu từ nguồn. Có thể cấu hình `OPENROUTER_API_KEY` nếu muốn AI upstream. Sau deploy, kiểm tra `/ready`, `/api/v1/market/overview` và `/api/v1/stocks?limit=10`. Render services/database có thể phát sinh phí tùy plan; xác nhận chi phí trong dashboard trước khi provision.
 
 ---
 
@@ -181,9 +173,10 @@ finsight/
 
 ## Dữ liệu
 
-- Giá cổ phiếu: `vnstock` → Trading KBS (realtime quote), VCI (OHLCV history)
-- Chỉ số: `vnstock` Market API
-- Tin tức: RSS feeds (VnExpress, VnEconomy)
-- AI: OpenRouter — `deepseek/deepseek-chat-v3.1`
-
-Khi backend offline hoặc vnstock không phản hồi, app tự động dùng seed data để không bị trắng trang.
+- Giá cổ phiếu: provider CSV synthetic mặc định; vnstock v5 là tuỳ chọn local, chưa bật cho public demo khi chưa xác nhận quyền dữ liệu.
+- Danh mục mã/ngành: CSV synthetic mặc định; vnstock v5 là tuỳ chọn local.
+- Tin tức: RSS VnExpress/VnEconomy, bật cho Render và Docker Compose sau khi chủ dự án xác nhận quyền lưu/hiển thị; bài giữ tên nhà xuất bản và liên kết nguồn. Kiểm tra lại điều khoản trước khi đổi mục đích phân phối.
+- AI: OpenRouter — `deepseek/deepseek-chat-v3.1`; market commentary dashboard hiển thị rule-based snapshot, không gắn nhãn là AI
+- Local Compose mặc định dùng dữ liệu **synthetic demo** tạo bởi `backend/scripts/generate_demo_data.py`, có `data_mode=synthetic-demo` và `source=csv-demo`; không phải giá lịch sử thật.
+- Khi provider thật lỗi, app không thay bằng giá demo tĩnh; nguồn/giá không có phải hiển thị lỗi hoặc `null`.
+- v1 JSON camelCase, prefix `/api/v1`; các route cũ còn lại cho tương thích trong lúc chuyển frontend.

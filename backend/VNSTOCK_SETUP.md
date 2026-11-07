@@ -1,41 +1,24 @@
-# FinSight VnStock Setup
+# Vnstock provider setup
 
-## Môi trường hiện tại
+FinSight keeps vnstock as an optional development provider behind `providers/vnstock_provider.py`. It is excluded from the public/demo container dependencies. Install the optional package locally only if your account tier permits the required features.
 
-- Python: 3.12
-- Virtual environment: `backend/venv`
-- Vnstock: `4.0.4`
-
-## Cách kích hoạt môi trường
+## Local setup
 
 ```powershell
-.\backend\venv\Scripts\Activate.ps1
+cd backend
+py -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -r requirements-vnstock.txt
 ```
 
-## Kiểm tra nhanh
+Some reference endpoints require an entitlement beyond guest access. The current `VnstockProvider` symbol-list call returned an entitlement error without credentials. Set `VNSTOCK_API_KEY` only when you have an eligible account/key, and never commit that key. Installing the optional adapter does not grant permission to display or redistribute upstream data.
 
-```powershell
-python -c "import vnstock; print(vnstock.__version__)"
-python -m pip show vnstock
-```
+## Data source methods
 
-## Diagnostics
+- Symbol directory: `Reference().equity.list_by_exchange()` and `list_by_industry()`.
+- Daily stock history: `Market().equity(symbol).ohlcv(source="vci")`.
+- Index history: `Market().index(symbol).ohlcv()`.
+- Batch quote board: `Market().quote(symbols)`.
 
-Chạy script kiểm tra môi trường khi cần:
+The exact columns and source coverage can change upstream. All calls are isolated in the provider adapter and recorded in stored bar `source` fields. Do not treat delayed provider values as exchange realtime data.
 
-```powershell
-$env:PYTHONUTF8='1'
-py C:\Users\Huynguyen\Desktop\FinSight\vnstock-vibe-coding-main\vnstock-vibe-coding-main\.agents\skills\vnstock-vibe-onboarding\scripts\diagnostics.py
-```
-
-## Ghi chú kỹ thuật
-
-- Backend FinSight đã có sẵn `vnstock 4.0.4` trong `backend/venv`
-- Không cần cài lại nếu bạn chỉ đang tiếp tục phát triển project hiện tại
-- Khi thêm nguồn dữ liệu mới, ưu tiên đặt logic ở `backend/services/` thay vì viết trực tiếp trong `main.py`
-- Có thể cấu hình nguồn tin tài chính bằng biến môi trường `FINSIGHT_NEWS_FEEDS`
-- Ví dụ:
-
-```powershell
-$env:FINSIGHT_NEWS_FEEDS="https://vnexpress.net/rss/kinh-doanh.rss,https://vneconomy.vn/rss.htm"
-```
+For a reproducible local or public demo without upstream access, use `MARKET_PROVIDER=csv`; this is the default. The checked-in CSV history is synthetic demo data and is labeled `csv-demo` in storage. Do not silently fall back to it when a real provider fails.

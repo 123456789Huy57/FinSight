@@ -14,6 +14,7 @@ import { ExplainPanel } from '@/components/ai/ExplainPanel'
 import { ChatWidget } from '@/components/ai/ChatWidget'
 import { MarketStatusBadge } from '@/components/shared/MarketStatusBadge'
 import { useMarketPolling } from '@/lib/useMarketPolling'
+import { formatDataAsOf } from '@/lib/format'
 
 import {
   getMarketIndices,
@@ -32,23 +33,6 @@ import type {
   AIExplainRequest,
 } from '@/lib/api'
 
-// ─── Demo fallbacks ────────────────────────────────────────────
-
-const DEMO_INDICES: MarketIndex[] = [
-  { symbol: 'VNINDEX', exchange: 'HOSE', points: 1835.42, change: 29.22, percent_change: 1.62, volume: 270409521, updated_at: '' },
-  { symbol: 'VN30',    exchange: 'HOSE', points: 1972.85, change: 15.68, percent_change: 0.80, volume: 128393975, updated_at: '' },
-  { symbol: 'HNX30',   exchange: 'HNX',  points: 529.31,  change: 1.01,  percent_change: 0.19, volume: 12183912,  updated_at: '' },
-  { symbol: 'UPCOMINDEX', exchange: 'UPCOM', points: 128.45, change: 1.38, percent_change: 1.09, volume: 10770905, updated_at: '' },
-]
-
-const DEMO_GAINERS: MarketMover[] = [
-  { symbol: 'VCB', exchange: 'HOSE', current_price: 92300, price_change: 3200, percent_change: 3.59, volume: 1245000 },
-  { symbol: 'FPT', exchange: 'HOSE', current_price: 142500, price_change: 4500, percent_change: 3.26, volume: 2045000 },
-  { symbol: 'GEX', exchange: 'HOSE', current_price: 21200, price_change: 650,  percent_change: 3.16, volume: 8450000 },
-  { symbol: 'MWG', exchange: 'HOSE', current_price: 67500, price_change: 1800, percent_change: 2.74, volume: 3345000 },
-  { symbol: 'SSI', exchange: 'HOSE', current_price: 35400, price_change: 900,  percent_change: 2.61, volume: 6789000 },
-]
-
 const DEMO_LOSERS: MarketMover[] = [
   { symbol: 'HNG', exchange: 'HOSE', current_price: 8800,  price_change: -400,  percent_change: -4.35, volume: 2450000 },
   { symbol: 'PDR', exchange: 'HOSE', current_price: 22100, price_change: -700,  percent_change: -3.07, volume: 1450000 },
@@ -56,11 +40,6 @@ const DEMO_LOSERS: MarketMover[] = [
   { symbol: 'VCI', exchange: 'HOSE', current_price: 48700, price_change: -1100, percent_change: -2.21, volume: 2890000 },
   { symbol: 'HCM', exchange: 'HOSE', current_price: 31400, price_change: -650,  percent_change: -2.03, volume: 1765000 },
 ]
-
-const DEMO_BREADTH: MarketBreadth = {
-  advancers: 287, decliners: 143, unchanged: 22,
-  sentiment: 'RISK-ON', status: 'Breadth 2:1',
-}
 
 // ─── Page ──────────────────────────────────────────────────────
 
@@ -77,7 +56,8 @@ export default function DashboardPage() {
   const [loadingMain,       setLoadingMain]       = useState(true)
   const [loadingCommentary, setLoadingCommentary] = useState(true)
   const [loadingNews,       setLoadingNews]       = useState(true)
-  const [lastUpdated,       setLastUpdated]       = useState<Date | null>(null)
+  const [lastUpdated,       setLastUpdated]       = useState<string | null>(null)
+  const [syntheticData,     setSyntheticData]     = useState(false)
 
   const [explainOpen, setExplainOpen] = useState(false)
   const [explainReq,  setExplainReq]  = useState<AIExplainRequest | null>(null)
@@ -117,6 +97,8 @@ export default function DashboardPage() {
 
       if (idxRes.status === 'fulfilled' && idxRes.value?.indices?.length)
         setIndices(idxRes.value.indices)
+      if (idxRes.status === 'fulfilled')
+        setSyntheticData(idxRes.value.data_mode === 'synthetic-demo')
 
       if (commentaryRes.status === 'fulfilled' && commentaryRes.value) {
         const data = commentaryRes.value
@@ -143,7 +125,15 @@ export default function DashboardPage() {
         setNews([])
       }
 
-      setLastUpdated(new Date())
+      const timestamps = [
+        idxRes.status === 'fulfilled' ? idxRes.value.timestamp : null,
+        commentaryRes.status === 'fulfilled' ? commentaryRes.value?.updated_at : null,
+        actRes.status === 'fulfilled' ? actRes.value?.updated_at : null,
+      ].filter((value): value is string => Boolean(value))
+      const parsed = timestamps
+        .map((value) => ({ value, time: new Date(value).getTime() }))
+        .filter((item) => !Number.isNaN(item.time))
+      if (parsed.length) setLastUpdated(parsed.sort((a, b) => b.time - a.time)[0].value)
     } finally {
       if (!silent) {
         setLoadingMain(false)
@@ -166,12 +156,17 @@ export default function DashboardPage() {
       <div className="max-w-screen-2xl mx-auto px-4 lg:px-6 py-4 space-y-4">
 
         {/* Status bar */}
+        {syntheticData && (
+          <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            Dữ liệu minh họa tổng hợp, không phải giá thị trường thật.
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <MarketStatusBadge status={marketStatus} />
             <span className="text-[11px] text-[#3d4f6b]">
               {lastUpdated
-                ? `Cập nhật ${lastUpdated.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+                ? `Dữ liệu phiên ${formatDataAsOf(lastUpdated)}`
                 : 'Đang tải...'}
             </span>
           </div>

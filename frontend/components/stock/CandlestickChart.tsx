@@ -6,10 +6,11 @@ import type { OHLCVCandle } from '@/lib/api'
 
 interface Props {
   candles: OHLCVCandle[]
+  newsMarkers?: Array<{ time: string; title: string }>
   height?: number
 }
 
-export function CandlestickChart({ candles, height = 360 }: Props) {
+export function CandlestickChart({ candles, newsMarkers = [], height = 360 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export function CandlestickChart({ candles, height = 360 }: Props) {
       LineSeries,
       ColorType,
       CrosshairMode,
+      createSeriesMarkers,
     }) => {
       if (!mounted || !containerRef.current) return
 
@@ -96,6 +98,17 @@ export function CandlestickChart({ candles, height = 360 }: Props) {
             close: c.close,
           }))
         )
+        if (newsMarkers.length) {
+          createSeriesMarkers(series, newsMarkers.map((marker, index) => ({
+            id: `news-${index}-${marker.time}`,
+            time: marker.time,
+            position: 'aboveBar' as const,
+            shape: 'circle' as const,
+            color: '#4f8ef7',
+            text: 'N',
+            size: 1,
+          })))
+        }
       } else {
         const series = chart.addSeries(LineSeries, {
           color: up ? '#34d399' : '#f87171',
@@ -109,6 +122,17 @@ export function CandlestickChart({ candles, height = 360 }: Props) {
             value: c.close,
           }))
         )
+        if (newsMarkers.length) {
+          createSeriesMarkers(series, newsMarkers.map((marker, index) => ({
+            id: `news-${index}-${marker.time}`,
+            time: marker.time,
+            position: 'aboveBar' as const,
+            shape: 'circle' as const,
+            color: '#4f8ef7',
+            text: 'N',
+            size: 1,
+          })))
+        }
       }
 
       const hasVolume = data.some(c => c.volume != null && c.volume > 0)
@@ -141,7 +165,7 @@ export function CandlestickChart({ candles, height = 360 }: Props) {
       mounted = false
       chart?.remove()
     }
-  }, [candles, height])
+  }, [candles, height, newsMarkers])
 
   if (!candles.length) {
     return (

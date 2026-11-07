@@ -5,11 +5,13 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { getQuote } from '@/lib/api'
 import type { Quote } from '@/lib/api'
+import { accountFetch, ACCESS_TOKEN_KEY } from '@/lib/account'
 
 const STORAGE_KEY = 'finsight_watchlist'
 const DEFAULT_WATCHLIST = ['VCB', 'FPT', 'MWG', 'SSI', 'HPG']
 
-function fmtPrice(v: number) {
+function fmtPrice(v: number | null) {
+  if (v == null) return '-'
   return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
@@ -39,14 +41,34 @@ function useWatchlist() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   }
 
-  return { symbols, add, remove }
+  return { symbols, add, remove, replace: setSymbols }
 }
 
 export function Watchlist() {
-  const { symbols, add, remove } = useWatchlist()
+  const { symbols, add, remove, replace } = useWatchlist()
+  const [token, setToken] = useState('')
   const [quotes,   setQuotes]   = useState<Record<string, Quote>>({})
   const [loading,  setLoading]  = useState(false)
   const [addInput, setAddInput] = useState('')
+
+  useEffect(() => {
+    const savedToken = sessionStorage.getItem(ACCESS_TOKEN_KEY)
+    if (!savedToken) return
+    setToken(savedToken)
+    void accountFetch('/api/v1/watchlist', { headers: { Authorization: `Bearer ${savedToken}` } })
+      .then(async (response) => {
+        if (!response.ok) return
+        const data = await response.json() as { items: Array<{ symbol: string }> }
+        const accountSymbols = data.items.map((item) => item.symbol)
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(accountSymbols))
+        setQuotes({})
+        setAddInput('')
+        replace(accountSymbols)
+      })
+      .catch(() => undefined)
+  // Load the user-owned list once when this dashboard mounts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchQuotes = async () => {
     if (!symbols.length) return
@@ -67,10 +89,28 @@ export function Watchlist() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbols.join(',')])
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     const sym = addInput.trim().toUpperCase()
-    if (sym && !symbols.includes(sym)) { add(sym); setAddInput('') }
+    if (!sym || symbols.includes(sym)) return
+    if (token) {
+      const response = await accountFetch('/api/v1/watchlist', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ symbol: sym }),
+      })
+      if (!response.ok) return
+    }
+    add(sym); setAddInput('')
+  }
+
+  const handleRemove = async (sym: string) => {
+    if (token) {
+      const response = await accountFetch(`/api/v1/watchlist/${encodeURIComponent(sym)}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) return
+    }
+    remove(sym)
   }
 
   return (
@@ -110,7 +150,7 @@ export function Watchlist() {
                   <>
                     <span className="text-[11px] text-[#7a8ba8] tabular">{fmtPrice(q.current_price)}</span>
                     <span className={`text-[12px] font-bold tabular w-[46px] text-right ${up ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
-                      {up ? '+' : ''}{q.percent_change.toFixed(2)}%
+                      {q.percent_change == null ? '-' : `${up ? '+' : ''}${q.percent_change.toFixed(2)}%`}
                     </span>
                   </>
                 ) : (
@@ -118,7 +158,7 @@ export function Watchlist() {
                 )}
                 <button
                   type="button"
-                  onClick={() => remove(sym)}
+                  onClick={() => void handleRemove(sym)}
                   className="opacity-0 group-hover:opacity-100 text-[#3d4f6b] hover:text-[#f87171] transition-all"
                 >
                   <X className="w-3 h-3" />
@@ -146,6 +186,9 @@ export function Watchlist() {
           <Plus className="w-3.5 h-3.5" />
         </button>
       </form>
+      <div className="border-t border-[#1a2744] px-3 py-2 text-[11px] text-[#7a8ba8]">
+        {token ? 'Watchlist đang đồng bộ với tài khoản.' : <Link href="/account" className="hover:text-primary">Đăng nhập để đồng bộ watchlist và quản lý danh mục →</Link>}
+      </div>
     </div>
   )
 }

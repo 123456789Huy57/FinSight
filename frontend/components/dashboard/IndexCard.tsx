@@ -3,11 +3,13 @@
 import type { MarketIndex, AIExplainRequest } from '@/lib/api'
 import { ExplainButton } from '@/components/shared/ExplainButton'
 
-function fmt(n: number) {
+function fmt(n: number | null) {
+  if (n == null) return '-'
   return n.toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
 
-function fmtVol(n: number) {
+function fmtVol(n: number | null) {
+  if (n == null) return '-'
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
@@ -21,13 +23,13 @@ export function IndexCard({ index, onExplain, primary = false }: {
   onExplain: (req: AIExplainRequest) => void
   primary?: boolean
 }) {
-  const up = index.change >= 0
-  const fillPct = Math.min(Math.abs(index.percent_change) / BAR_SCALE * 50, 50)
+  const up = (index.change ?? 0) >= 0
+  const fillPct = index.percent_change == null ? 0 : Math.min(Math.abs(index.percent_change) / BAR_SCALE * 50, 50)
 
   const handleExplain = () =>
     onExplain({
       type: 'index', title: index.symbol, symbol: index.symbol,
-      context: `Điểm: ${fmt(index.points)}, Biến động: ${index.change >= 0 ? '+' : ''}${fmt(index.change)} (${index.percent_change >= 0 ? '+' : ''}${index.percent_change.toFixed(2)}%), KL: ${fmtVol(index.volume)}`,
+      context: `Điểm: ${fmt(index.points)}, Biến động: ${index.change == null ? 'không có dữ liệu' : `${index.change >= 0 ? '+' : ''}${fmt(index.change)}`}, %: ${index.percent_change == null ? 'không có dữ liệu' : `${index.percent_change >= 0 ? '+' : ''}${index.percent_change.toFixed(2)}%`}, KL: ${fmtVol(index.volume)}`,
       snapshot: { symbol: index.symbol, exchange: index.exchange, points: index.points, change: index.change, percent_change: index.percent_change, volume: index.volume },
     })
 
@@ -52,7 +54,7 @@ export function IndexCard({ index, onExplain, primary = false }: {
             {fmt(index.points)}
           </p>
           <div className={`inline-flex items-center gap-1.5 mt-2 px-2 py-0.5 rounded-md text-[12px] font-bold tabular ${up ? 'text-[#34d399] bg-[#34d399]/12' : 'text-[#f87171] bg-[#f87171]/12'}`}>
-            {up ? '+' : ''}{fmt(index.change)} ({up ? '+' : ''}{index.percent_change.toFixed(2)}%)
+            {index.change == null ? '-' : `${up ? '+' : ''}${fmt(index.change)}`} ({index.percent_change == null ? '-' : `${up ? '+' : ''}${index.percent_change.toFixed(2)}%`})
           </div>
         </div>
 
@@ -87,8 +89,8 @@ export function IndexCard({ index, onExplain, primary = false }: {
           {fmt(index.points)}
         </p>
         <div className={`flex items-center gap-1.5 mt-1.5 ${up ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
-          <span className="text-[12px] font-bold tabular">{up ? '+' : ''}{fmt(index.change)}</span>
-          <span className="text-[11px] font-semibold tabular opacity-70">{up ? '+' : ''}{index.percent_change.toFixed(2)}%</span>
+          <span className="text-[12px] font-bold tabular">{index.change == null ? '-' : `${up ? '+' : ''}${fmt(index.change)}`}</span>
+          <span className="text-[11px] font-semibold tabular opacity-70">{index.percent_change == null ? '-' : `${up ? '+' : ''}${index.percent_change.toFixed(2)}%`}</span>
         </div>
       </div>
 
