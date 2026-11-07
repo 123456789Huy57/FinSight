@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 
-import { MarketTicker } from '@/components/layout/MarketTicker'
 import { IndexStrip } from '@/components/dashboard/IndexCard'
 import { MoversPanel } from '@/components/dashboard/MoversPanel'
 import { CommentaryPanel } from '@/components/dashboard/CommentaryPanel'
@@ -151,8 +150,6 @@ export default function DashboardPage() {
 
   return (
     <>
-      <MarketTicker indices={indices} />
-
       <div className="max-w-screen-2xl mx-auto px-4 lg:px-6 py-4 space-y-4">
 
         {/* Status bar */}
