@@ -126,3 +126,7 @@
 - The worker recomputes event rows after news ingestion and end-of-day price
   ingestion. The news API returns per-symbol T+1/T+5 windows for article cards
   and stock-chart pins. No grouped “similar news” aggregate is exposed yet.
+
+## FE-43a: đơn vị cổ tức
+- `fundamentals.dividend_yield` là `Numeric(9,4)`, API trả nguyên giá trị; hiện chưa có seed hay provider nào ghi cột này. Quy ước chốt: lưu dạng phân số (0,028 = 2,8%), giao diện nhân 100 khi hiển thị. Provider ghi cột này sau này phải theo quy ước đó.
+- T+1/T+5 chỉ hiện số khi `status=measured`, `dataMode=market-provider` và có `methodVersion`; còn lại hiện "Dữ liệu minh hoạ" (hàm `reactionLabel` trong `lib/reactions.ts`).

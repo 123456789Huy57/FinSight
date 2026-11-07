@@ -9,7 +9,7 @@ type Props<T extends string> = {
 
 export function Segmented<T extends string>({ options, value, onChange, label }: Props<T>) {
   return (
-    <div role="tablist" aria-label={label} className="inline-flex gap-1 rounded-lg bg-[var(--fs-surface)] p-1">
+    <div role="tablist" aria-label={label} className="flex flex-wrap gap-1 rounded-lg bg-[var(--fs-surface)] p-1">
       {options.map((o) => {
         const active = o.value === value
         return (

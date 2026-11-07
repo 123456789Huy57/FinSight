@@ -1,5 +1,6 @@
 'use client'
 
+import { reactionLabel } from '@/lib/reactions'
 import Link from 'next/link'
 import type { NewsItem, NewsReaction, AIExplainRequest } from '@/lib/api'
 import { ExplainButton } from '@/components/shared/ExplainButton'
@@ -8,19 +9,9 @@ import { Panel, Change, SymbolChip, EmptyState } from '@/components/fs'
 import { formatNewsTime } from '@/components/news/NewsCard'
 
 function Reaction({ r }: { r: NewsReaction | undefined }) {
-  if (!r) return <span className="text-[var(--fs-muted)]">–</span>
-  switch (r.status) {
-    case 'measured':
-      return <Change value={r.t1.abnormalReturnPct} />
-    case 'pending':
-      return <span className="text-[var(--fs-muted)]">Chờ</span>
-    case 'insufficient_data':
-      return <span className="text-[var(--fs-muted)]">Chưa đủ dữ liệu</span>
-    case 'overlapping_event':
-      return <span className="text-[var(--fs-muted)]">Trùng tin khác</span>
-    default:
-      return <span className="text-[var(--fs-muted)]">–</span>
-  }
+  const label = reactionLabel(r, 't1')
+  if (label.kind === 'number') return <Change value={label.value} />
+  return <span className="text-[var(--fs-muted)]">{label.text}</span>
 }
 
 interface NewsPanelProps {

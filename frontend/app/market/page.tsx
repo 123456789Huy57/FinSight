@@ -317,14 +317,12 @@ export default function MarketPage() {
                       <option key={s} value={s}>{s === 'Tất cả' ? 'Mọi ngành' : s}</option>
                     ))}
                   </select>
-                  <div className="max-w-full overflow-x-auto">
-                    <Segmented
-                      label="Biến động giá"
-                      options={CHANGE_OPTS.map((o) => ({ value: o.key, label: o.label }))}
-                      value={changeFilter}
-                      onChange={setChangeFilter}
-                    />
-                  </div>
+                  <Segmented
+                    label="Biến động giá"
+                    options={CHANGE_OPTS.map((o) => ({ value: o.key, label: o.label }))}
+                    value={changeFilter}
+                    onChange={setChangeFilter}
+                  />
                 </div>
 
                 {/* Dải thống kê */}

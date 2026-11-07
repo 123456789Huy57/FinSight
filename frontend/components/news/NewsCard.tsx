@@ -1,6 +1,7 @@
 'use client'
 
-import type { EventWindow, NewsItem, NewsReaction, AIExplainRequest } from '@/lib/api'
+import { reactionLabel } from '@/lib/reactions'
+import type { NewsItem, NewsReaction, AIExplainRequest } from '@/lib/api'
 import { ExplainButton } from '@/components/shared/ExplainButton'
 import { Change, SymbolChip } from '@/components/fs'
 
@@ -51,15 +52,12 @@ export function sentimentLine(item: NewsItem): string {
   return `Sắc thái ${word}, điểm ${sign}${body}`
 }
 
-function WindowValue({ window }: { window: EventWindow }) {
-  if (window.status === 'measured' && window.abnormalReturnPct != null) {
-    return <Change value={window.abnormalReturnPct} className="text-[14px] font-medium" />
+function WindowValue({ reaction, window }: { reaction: NewsReaction; window: 't1' | 't5' }) {
+  const label = reactionLabel(reaction, window)
+  if (label.kind === 'number') {
+    return <Change value={label.value} className="text-[14px] font-medium" />
   }
-  const text =
-    window.status === 'pending' ? 'Chờ phiên sau'
-    : window.status === 'overlapping_event' ? 'Trùng tin khác'
-    : 'Chưa đủ dữ liệu'
-  return <span className="text-[13px] text-[var(--fs-muted)]" title={window.reason ?? undefined}>{text}</span>
+  return <span className="text-[13px] text-[var(--fs-muted)]" title={label.title}>{label.text}</span>
 }
 
 export function ReactionColumns({ reaction, extra = 0 }: { reaction?: NewsReaction; extra?: number }) {
@@ -68,11 +66,11 @@ export function ReactionColumns({ reaction, extra = 0 }: { reaction?: NewsReacti
     <div className="flex gap-6 sm:gap-5">
       <div className="min-w-[88px]">
         <p className="text-[12px] text-[var(--fs-muted)]">Phiên sau</p>
-        <WindowValue window={reaction.t1} />
+        <WindowValue reaction={reaction} window="t1" />
       </div>
       <div className="min-w-[88px]">
         <p className="text-[12px] text-[var(--fs-muted)]">5 phiên</p>
-        <WindowValue window={reaction.t5} />
+        <WindowValue reaction={reaction} window="t5" />
         {extra > 0 && <p className="text-[12px] text-[var(--fs-muted)]">+{extra} mã</p>}
       </div>
     </div>

@@ -423,7 +423,7 @@ export default function StockPage({ params }: Props) {
                   <Row label="P/E">{valueOrNoData(profile?.pe, (n) => fmtPriceVi(n, 2))}</Row>
                   <Row label="P/B">{valueOrNoData(profile?.pb, (n) => fmtPriceVi(n, 2))}</Row>
                   <Row label="EPS">{valueOrNoData(profile?.eps, (n) => fmtPriceVi(n, 0))}</Row>
-                  <Row label="Cổ tức">{valueOrNoData(profile?.dividend_yield, (n) => `${fmtPriceVi(n, 2)}%`)}</Row>
+                  <Row label="Cổ tức">{valueOrNoData(profile?.dividend_yield, (n) => `${fmtPriceVi(n * 100, 2)}%`)}</Row>
                   <Row label="KL trung bình">{valueOrNoData(profile?.avg_volume, fmtCompact)}</Row>
                 </dl>
                 {profile?.fundamental_source && (

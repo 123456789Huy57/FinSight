@@ -19,8 +19,8 @@ export function ExplainButton({ onClick, label, size = 'sm', className = '' }: E
         type="button"
         onClick={(e) => { e.stopPropagation(); onClick() }}
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-          bg-primary/10 text-primary border border-primary/25
-          hover:bg-primary/20 hover:border-primary/50 transition-all duration-150
+          border border-[var(--fs-line)] text-[var(--fs-ink)]
+          hover:border-[var(--fs-ink)] transition-colors duration-150
           cursor-pointer select-none ${className}`}
       >
         <Sparkles className="w-3.5 h-3.5" />
@@ -34,8 +34,8 @@ export function ExplainButton({ onClick, label, size = 'sm', className = '' }: E
       type="button"
       onClick={(e) => { e.stopPropagation(); onClick() }}
       className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold
-        bg-primary/8 text-primary/70 border border-primary/20
-        hover:bg-primary/15 hover:text-primary hover:border-primary/40 transition-all duration-150
+        border border-[var(--fs-line)] text-[var(--fs-ink)]
+        hover:border-[var(--fs-ink)] transition-colors duration-150
         cursor-pointer select-none whitespace-nowrap ${className}`}
     >
       <Sparkles className="w-3 h-3" />
