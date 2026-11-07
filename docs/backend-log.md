@@ -16,3 +16,10 @@
 - Gọi thử FPT và VNINDEX qua Vnstock 5.2.1 ở cấp Khách: đều trả 7 nến, nguồn VCI/KBS.
 - Còn chặn: danh sách mã đòi key Community; Docker Engine chưa chạy. Full pytest chưa chạy xong.
 - `mypy domain` còn 2 lỗi có sẵn tại `domain/event_study.py:174,184`.
+
+## BE-VN — xác minh chạy cục bộ với key Community
+
+- Xác nhận `.env` có `VNSTOCK_API_KEY` (không ghi giá trị vào log); `docker compose up --build -d` chạy thành công.
+- Worker đồng bộ thành công 15 mã (7.455 nến) và 3 chỉ số (1.490 nến); `/api/v1/market/data-status` báo `current`, nguồn `vnstock`, giá và chỉ số đến ngày 2026-11-06.
+- `/api/v1/stocks/FPT` trả giá 50.800 đồng từ `vnstock`; endpoint lịch sử FPT trả 2 bản ghi và endpoint chỉ số trả 3 chỉ số. Frontend `/`, `/market`, `/news`, `/stock/FPT` đều HTTP 200.
+- `python -m pytest tests -q --cov=domain --cov-fail-under=80` trong backend container: 40 qua, 2 lỗi, coverage 87,87%. Hai lỗi do test còn giả định nguồn `csv-demo` và tin tức tắt, trong khi môi trường chạy đang dùng `vnstock` và bật tin tức. Lệnh `pytest` trực tiếp còn lỗi import; dùng `python -m pytest` để chạy đúng.
