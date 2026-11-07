@@ -1,6 +1,9 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { TopNav } from '@/components/layout/TopNav'
+import '@fontsource/be-vietnam-pro/400.css'
+import '@fontsource/be-vietnam-pro/500.css'
+import '@fontsource/be-vietnam-pro/600.css'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -17,14 +20,14 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'dark',
-  themeColor: '#070d1a',
+  colorScheme: 'light',
+  themeColor: '#ffffff',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body className="font-sans antialiased bg-background text-foreground min-h-screen">
+      <body className="font-sans antialiased bg-[var(--fs-surface)] text-[var(--fs-ink)] min-h-screen">
         <TopNav />
         <main>{children}</main>
         {process.env.NODE_ENV === 'production' && <Analytics />}

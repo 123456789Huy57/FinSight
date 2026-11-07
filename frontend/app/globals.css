@@ -56,6 +56,7 @@
   --color-ticker-bg:         #060c18;
 
   /* === Mono font === */
+  --font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
 }
 
@@ -207,4 +208,65 @@ main { min-height: calc(100vh - 64px); }
 }
 .border-glow:hover {
   border-color: rgba(79, 142, 247, 0.28);
+}
+
+/* ===== FinSight tokens (dùng chung landing + dashboard) ===== */
+:root {
+  --fs-ink: #14161a;
+  --fs-ink-2: #3b3f47;
+  --fs-muted: #6b7079;
+  --fs-line: #e6e8ec;
+  --fs-surface: #f5f6f8;
+  --fs-paper: #ffffff;
+  --fs-signal: #2f4bff;
+  --fs-signal-soft: #e9edff;
+  --fs-up: #12a150;
+  --fs-down: #d9343b;
+  --fs-flat: #a07a00;
+}
+
+/* ===== Landing & chart ===== */
+.tabular-nums,
+.fs-heatmap,
+.fs-chart {
+  font-variant-numeric: tabular-nums;
+}
+.fs-display {
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+  text-wrap: balance;
+}
+.fs-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: fs-draw 1.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.fs-pop {
+  opacity: 0;
+  animation: fs-pop 0.45s ease-out forwards;
+}
+@keyframes fs-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes fs-pop {
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fs-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .fs-pop {
+    animation: none;
+    opacity: 1;
+  }
+}
+:focus-visible {
+  outline: 2px solid var(--fs-signal);
+  outline-offset: 2px;
 }
