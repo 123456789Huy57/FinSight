@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function StockIndexPage() {
-  redirect('/market')
+  redirect('/stock/VCB')
 }

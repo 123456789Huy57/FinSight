@@ -42,6 +42,16 @@ export function CandlestickChart({ candles, newsMarkers = [], height = 360 }: Pr
     if (!data.length) return
 
     const up = data[data.length - 1].close >= data[0].close
+
+    // lightweight-charts cần chuỗi màu, nên đọc token từ CSS. Giá trị dự phòng khớp globals.css.
+    const css = getComputedStyle(document.documentElement)
+    const token = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback
+    const upColor = token('--fs-up', '#12a150')
+    const downColor = token('--fs-down', '#d9343b')
+    const signalColor = token('--fs-signal', '#2f4bff')
+    const mutedColor = token('--fs-muted', '#6b7079')
+    const lineColor = token('--fs-line', '#e6e8ec')
+    const withAlpha = (color: string) => (/^#[0-9a-f]{6}$/i.test(color) ? `${color}59` : color)
     let chart: IChartApi | null = null
     let mounted = true
 
@@ -61,13 +71,13 @@ export function CandlestickChart({ candles, newsMarkers = [], height = 360 }: Pr
         height,
         layout: {
           background: { type: ColorType.Solid, color: 'transparent' },
-          textColor: '#94a3b8',
-          fontFamily: "Inter, 'Segoe UI', system-ui, sans-serif",
+          textColor: mutedColor,
+          fontFamily: "'Be Vietnam Pro', system-ui, sans-serif",
           fontSize: 11,
         },
         grid: {
-          vertLines: { color: 'rgba(148,163,184,0.07)' },
-          horzLines: { color: 'rgba(148,163,184,0.07)' },
+          vertLines: { color: lineColor },
+          horzLines: { color: lineColor },
         },
         crosshair: { mode: CrosshairMode.Normal },
         rightPriceScale: {
@@ -83,11 +93,11 @@ export function CandlestickChart({ candles, newsMarkers = [], height = 360 }: Pr
 
       if (hasRealOHLC) {
         const series = chart.addSeries(CandlestickSeries, {
-          upColor: '#34d399',
-          downColor: '#f87171',
+          upColor,
+          downColor,
           borderVisible: false,
-          wickUpColor: '#34d399',
-          wickDownColor: '#f87171',
+          wickUpColor: upColor,
+          wickDownColor: downColor,
         })
         series.setData(
           data.map(c => ({
@@ -104,14 +114,14 @@ export function CandlestickChart({ candles, newsMarkers = [], height = 360 }: Pr
             time: marker.time,
             position: 'aboveBar' as const,
             shape: 'circle' as const,
-            color: '#4f8ef7',
-            text: 'N',
+            color: signalColor,
+            text: '',
             size: 1,
           })))
         }
       } else {
         const series = chart.addSeries(LineSeries, {
-          color: up ? '#34d399' : '#f87171',
+          color: up ? upColor : downColor,
           lineWidth: 2 as const,
           lastValueVisible: false,
           priceLineVisible: false,
@@ -128,8 +138,8 @@ export function CandlestickChart({ candles, newsMarkers = [], height = 360 }: Pr
             time: marker.time,
             position: 'aboveBar' as const,
             shape: 'circle' as const,
-            color: '#4f8ef7',
-            text: 'N',
+            color: signalColor,
+            text: '',
             size: 1,
           })))
         }
@@ -152,8 +162,8 @@ export function CandlestickChart({ candles, newsMarkers = [], height = 360 }: Pr
               value: c.volume!,
               color:
                 c.close >= c.open
-                  ? 'rgba(34,197,94,0.35)'
-                  : 'rgba(239,68,68,0.35)',
+                  ? withAlpha(upColor)
+                  : withAlpha(downColor),
             }))
         )
       }
@@ -170,7 +180,7 @@ export function CandlestickChart({ candles, newsMarkers = [], height = 360 }: Pr
   if (!candles.length) {
     return (
       <div
-        className="flex items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground"
+        className="flex items-center justify-center rounded-xl border border-dashed border-[var(--fs-line)] text-[14px] text-[var(--fs-muted)]"
         style={{ height }}
       >
         Không có dữ liệu biểu đồ
