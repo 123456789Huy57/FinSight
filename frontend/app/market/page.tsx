@@ -8,34 +8,15 @@ import { BreadthPanel, SectorPanel } from '@/components/dashboard/BreadthSectorP
 import { ExplainPanel } from '@/components/ai/ExplainPanel'
 import { ChatWidget } from '@/components/ai/ChatWidget'
 import { Skeleton } from '@/components/shared/Skeleton'
+import { Panel, PageHeader, Change, Segmented, EmptyState } from '@/components/fs'
 import { getScreenerData, getMarketCommentary } from '@/lib/api'
-import { formatDataAsOf } from '@/lib/format'
+import { fmtPrice, fmtCompact } from '@/lib/format'
 import type {
   ScreenerStock,
   MarketBreadth,
   SectorPerformanceResponse,
   AIExplainRequest,
 } from '@/lib/api'
-
-// ── Formatters ────────────────────────────────────────────────
-
-function fmtPrice(v: number | null) {
-  if (v == null) return '-'
-  return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-}
-
-function fmtChange(v: number | null) {
-  if (v == null) return '-'
-  const prefix = v >= 0 ? '+' : ''
-  return `${prefix}${v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
-}
-
-function fmtVol(v: number | null) {
-  if (v == null) return '-'
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
-  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`
-  return `${v}`
-}
 
 // ── Filters ───────────────────────────────────────────────────
 
@@ -67,6 +48,7 @@ function matchChange(pct: number | null, f: ChangeFilter): boolean {
 type SortKey = keyof Pick<
   ScreenerStock,
   'symbol' | 'exchange' | 'sector' | 'current_price' | 'price_change' | 'percent_change' | 'volume'
+  | 'trading_value' | 'market_cap' | 'pe' | 'pb'
 >
 type SortDir = 'asc' | 'desc'
 
@@ -83,51 +65,39 @@ interface ColDef {
   key: SortKey
   label: string
   align: 'left' | 'right'
-  thClass: string
-  tdClass: string
-  mobileHide?: boolean
+  show: string // lớp hiển thị theo độ rộng màn hình
 }
 
 const COLUMNS: ColDef[] = [
-  { key: 'symbol',         label: 'Mã',       align: 'left',  thClass: 'w-[76px] pl-4',  tdClass: 'pl-4 pr-2' },
-  { key: 'exchange',       label: 'Sàn',      align: 'left',  thClass: 'w-[68px]',        tdClass: 'px-2',      mobileHide: true },
-  { key: 'sector',         label: 'Ngành',    align: 'left',  thClass: 'min-w-[130px]',   tdClass: 'px-2',      mobileHide: true },
-  { key: 'current_price',  label: 'Giá',      align: 'right', thClass: 'w-[92px]',        tdClass: 'px-3'      },
-  { key: 'price_change',   label: 'Thay đổi', align: 'right', thClass: 'w-[96px]',        tdClass: 'px-3',      mobileHide: true },
-  { key: 'percent_change', label: '%',         align: 'right', thClass: 'w-[76px]',        tdClass: 'px-3'      },
-  { key: 'volume',         label: 'KL',       align: 'right', thClass: 'w-[76px] pr-4',   tdClass: 'pr-4 pl-2' },
+  { key: 'symbol',         label: 'Mã',       align: 'left',  show: '' },
+  { key: 'sector',         label: 'Ngành',    align: 'left',  show: 'hidden md:table-cell' },
+  { key: 'exchange',       label: 'Sàn',      align: 'left',  show: 'hidden sm:table-cell' },
+  { key: 'current_price',  label: 'Giá',      align: 'right', show: '' },
+  { key: 'percent_change', label: '%',        align: 'right', show: '' },
+  { key: 'trading_value',  label: 'GTGD',     align: 'right', show: 'hidden md:table-cell' },
+  { key: 'market_cap',     label: 'Vốn hoá',  align: 'right', show: 'hidden lg:table-cell' },
+  { key: 'pe',             label: 'P/E',      align: 'right', show: 'hidden lg:table-cell' },
+  { key: 'pb',             label: 'P/B',      align: 'right', show: 'hidden lg:table-cell' },
 ]
-
-// ── Exchange badge colours ────────────────────────────────────
-
-const EXCH_STYLE: Record<string, string> = {
-  HOSE:  'bg-primary/10 text-primary border-primary/20',
-  HNX:   'bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20',
-  UPCOM: 'bg-[#06b6d4]/10 text-[#06b6d4] border-[#06b6d4]/20',
-}
 
 // ── Subcomponents ─────────────────────────────────────────────
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
   if (sortKey !== col)
-    return <ArrowUpDown className="w-3 h-3 opacity-20 ml-0.5 flex-shrink-0" />
+    return <ArrowUpDown className="h-3 w-3 flex-shrink-0 opacity-40" aria-hidden="true" />
   return sortDir === 'asc'
-    ? <ArrowUp   className="w-3 h-3 text-primary ml-0.5 flex-shrink-0" />
-    : <ArrowDown className="w-3 h-3 text-primary ml-0.5 flex-shrink-0" />
+    ? <ArrowUp   className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+    : <ArrowDown className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
 }
 
 function ScreenerSkeleton() {
   return (
     <>
-      {Array.from({ length: 14 }).map((_, i) => (
-        <tr key={i} className="border-b border-[#0f1f3d]">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <tr key={i} className="border-b border-[var(--fs-line)]">
           {COLUMNS.map((col) => (
-            <td key={col.key} className={`py-2.5 ${col.tdClass} ${col.mobileHide ? 'hidden sm:table-cell' : ''}`}>
-              <Skeleton className={[
-                'h-3',
-                col.align === 'right' ? 'ml-auto' : '',
-                col.key === 'sector' ? 'w-28' : col.key === 'symbol' ? 'w-10' : 'w-full',
-              ].join(' ')} />
+            <td key={col.key} className={`px-3 py-3 ${col.show}`}>
+              <Skeleton className={`h-3 ${col.align === 'right' ? 'ml-auto' : ''} ${col.key === 'symbol' ? 'w-10' : 'w-full'}`} />
             </td>
           ))}
         </tr>
@@ -168,7 +138,7 @@ export default function MarketPage() {
     const queryExchange = params.get('exchange')
     const queryChange = params.get('change') as ChangeFilter | null
     const querySort = params.get('sort') as SortKey | null
-    const validSorts: SortKey[] = ['symbol', 'exchange', 'sector', 'current_price', 'price_change', 'percent_change', 'volume']
+    const validSorts: SortKey[] = ['symbol', 'exchange', 'sector', 'current_price', 'price_change', 'percent_change', 'volume', 'trading_value', 'market_cap', 'pe', 'pb']
     if (EXCHANGES.includes(queryExchange as ExchangeFilter)) setExchange(queryExchange as ExchangeFilter)
     if (params.has('sector')) setSector(params.get('sector') || 'Tất cả')
     if (queryChange && CHANGE_OPTS.some((option) => option.key === queryChange)) setChangeFilter(queryChange)
@@ -240,6 +210,13 @@ export default function MarketPage() {
     }
   }
 
+  const clearFilters = () => {
+    setExchange('Tất cả')
+    setSector('Tất cả')
+    setChangeFilter('all')
+    setSymbolQuery('')
+  }
+
   const allSectors = useMemo(() => {
     const set = new Set(stocks.map((s) => s.sector).filter(Boolean))
     return ['Tất cả', ...Array.from(set).sort()]
@@ -262,262 +239,170 @@ export default function MarketPage() {
     return list
   }, [stocks, exchange, sector, changeFilter, sortKey, sortDir])
 
+  const counts = useMemo(() => {
+    let up = 0, down = 0, flat = 0
+    for (const s of displayed) {
+      const p = s.percent_change
+      if (p == null) continue
+      if (p > 0) up++
+      else if (p < 0) down++
+      else flat++
+    }
+    return { up, down, flat }
+  }, [displayed])
+
+  const filtersActive = exchange !== 'Tất cả' || sector !== 'Tất cả' || changeFilter !== 'all' || symbolQuery.trim() !== ''
+
   return (
     <>
-      <div className="max-w-screen-2xl mx-auto px-4 lg:px-6 py-4">
-        {syntheticData && (
-          <div role="status" className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            Dữ liệu minh họa tổng hợp, không phải giá thị trường thật.
-          </div>
-        )}
-        {error && (
-          <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-red-200">
-            <span>{error}</span>
-            <button type="button" onClick={() => void fetchData()} className="font-semibold underline underline-offset-2">Thử lại</button>
-          </div>
-        )}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+      <div className="min-h-screen bg-[var(--fs-surface)] text-[var(--fs-ink)]">
+        <main className="mx-auto max-w-[1240px] px-4 pb-20 pt-8 sm:px-6">
+          <PageHeader
+            title="Cổ phiếu"
+            dataMode={syntheticData ? 'synthetic-demo' : lastUpdated ? 'market-provider' : null}
+            asOf={lastUpdated}
+            source={dataSource}
+            actions={
+              <button
+                type="button"
+                aria-label="Làm mới dữ liệu thị trường"
+                onClick={() => void fetchData()}
+                disabled={loading}
+                className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--fs-line)] bg-white hover:bg-[var(--fs-surface)] disabled:opacity-40"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            }
+          />
 
-          {/* Screener panel */}
-          <div className="xl:col-span-3">
-            <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] overflow-hidden shadow-lg shadow-black/50">
+          {error && (
+            <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--fs-line)] bg-white px-4 py-3 text-[13px]">
+              <span style={{ color: 'var(--fs-down)' }}>{error}</span>
+              <button type="button" onClick={() => void fetchData()} className="font-medium underline underline-offset-2">Thử lại</button>
+            </div>
+          )}
 
-              {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(79,142,247,0.12)]">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[13px] font-bold text-foreground">Bộ lọc cổ phiếu</span>
-                  {!loading && (
-                    <span className="text-[11px] text-[#7a8ba8] bg-[#1a2744] rounded-md px-2 py-0.5 font-medium tabular">
-                      {displayed.length}/{stocks.length}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  {lastUpdated && (
-                    <span className="text-[10px] text-[#3d4f6b] hidden sm:block">
-                      Phiên {formatDataAsOf(lastUpdated)}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    aria-label="Làm mới dữ liệu thị trường"
-                    onClick={() => void fetchData()}
-                    disabled={loading}
-                    className="p-1.5 rounded-lg text-[#7a8ba8] hover:text-foreground hover:bg-[#0e1726] transition-colors disabled:opacity-40"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Filter bar */}
-              <div className="px-4 py-2.5 border-b border-[#0f1f3d] bg-[#070d1a] flex flex-wrap items-center gap-x-3 gap-y-2">
-
-                {/* Exchange */}
-                <div className="flex items-center gap-1">
-                  {EXCHANGES.map((ex) => (
-                    <button
-                      key={ex}
-                      type="button"
-                      aria-pressed={exchange === ex}
-                      onClick={() => setExchange(ex)}
-                      className={[
-                        'text-[11px] font-semibold px-2.5 py-1 rounded-lg leading-none transition-colors',
-                        exchange === ex
-                          ? 'bg-primary text-white'
-                          : 'text-[#7a8ba8] hover:text-foreground hover:bg-[#0e1726]',
-                      ].join(' ')}
-                    >
-                      {ex}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="w-px h-4 bg-[#1a2744] hidden sm:block" />
-
-                {/* Sector */}
-                <select
-                  value={sector}
-                  onChange={(e) => setSector(e.target.value)}
-                  className="text-[11px] font-medium bg-[#0e1726] border border-[#1a2744] rounded-lg px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer leading-none"
-                >
-                  {allSectors.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-
-                <div className="w-px h-4 bg-[#1a2744] hidden sm:block" />
-
-                {/* Change% */}
-                <div className="flex items-center gap-1">
-                  {CHANGE_OPTS.map((opt) => {
-                    const active = changeFilter === opt.key
-                    let activeClass = 'bg-primary text-white'
-                    if (active && opt.key === 'strong_up')   activeClass = 'bg-[#34d399] text-[#052e16]'
-                    if (active && opt.key === 'up')          activeClass = 'bg-[#34d399]/20 text-[#34d399] border border-[#34d399]/30'
-                    if (active && opt.key === 'down')        activeClass = 'bg-[#f87171]/20 text-[#f87171] border border-[#f87171]/30'
-                    if (active && opt.key === 'strong_down') activeClass = 'bg-[#f87171] text-white'
-                    return (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        aria-pressed={changeFilter === opt.key}
-                        onClick={() => setChangeFilter(opt.key)}
-                        className={[
-                          'text-[11px] font-semibold px-2.5 py-1 rounded-lg leading-none transition-colors',
-                          active
-                            ? activeClass
-                            : 'text-[#7a8ba8] hover:text-foreground hover:bg-[#0e1726]',
-                        ].join(' ')}
-                      >
-                        {opt.label}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="w-px h-4 bg-[#1a2744] hidden sm:block" />
-
-                {/* Symbol search */}
-                <div className="relative flex items-center">
-                  <Search className="absolute left-2 w-3 h-3 text-[#3d4f6b] pointer-events-none" />
-                  <input
-                    type="text"
-                    value={symbolQuery}
-                    onChange={(e) => setSymbolQuery(e.target.value)}
-                    aria-label="Tìm mã hoặc tên công ty"
-                    placeholder="Mã / tên..."
-                    className="pl-6 pr-2 py-1 text-[11px] bg-[#0e1726] border border-[#1a2744] rounded-lg text-foreground placeholder:text-[#3d4f6b] focus:outline-none focus:ring-1 focus:ring-primary w-24 leading-none"
+          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-4">
+            <div className="min-w-0 xl:col-span-3">
+              <Panel
+                title="Danh sách cổ phiếu"
+                aside={!loading ? <span className="tabular-nums">{displayed.length}/{stocks.length} mã</span> : undefined}
+              >
+                {/* Thanh lọc */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-3 border-b border-[var(--fs-line)] px-5 py-3">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--fs-muted)]" aria-hidden="true" />
+                    <input
+                      type="text"
+                      value={symbolQuery}
+                      onChange={(e) => setSymbolQuery(e.target.value)}
+                      aria-label="Tìm mã hoặc tên công ty"
+                      placeholder="Tìm mã hoặc tên"
+                      className="h-9 w-44 rounded-lg border border-[var(--fs-line)] bg-white pl-9 pr-3 text-[14px] outline-none focus:border-[var(--fs-ink)]"
+                    />
+                  </div>
+                  <Segmented
+                    label="Sàn giao dịch"
+                    options={EXCHANGES.map((ex) => ({ value: ex, label: ex }))}
+                    value={exchange}
+                    onChange={setExchange}
                   />
+                  <select
+                    value={sector}
+                    onChange={(e) => setSector(e.target.value)}
+                    aria-label="Ngành"
+                    className="h-9 max-w-full rounded-lg border border-[var(--fs-line)] bg-white px-3 text-[14px] outline-none focus:border-[var(--fs-ink)]"
+                  >
+                    {allSectors.map((s) => (
+                      <option key={s} value={s}>{s === 'Tất cả' ? 'Mọi ngành' : s}</option>
+                    ))}
+                  </select>
+                  <div className="max-w-full overflow-x-auto">
+                    <Segmented
+                      label="Biến động giá"
+                      options={CHANGE_OPTS.map((o) => ({ value: o.key, label: o.label }))}
+                      value={changeFilter}
+                      onChange={setChangeFilter}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-[rgba(79,142,247,0.12)] bg-[#070d1a]">
-                      {COLUMNS.map((col) => (
-                        <th
-                          key={col.key}
-                          scope="col"
-                          aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                          className={[
-                            'py-2.5 text-[11px] font-semibold uppercase tracking-wide select-none',
-                            sortKey === col.key ? 'text-foreground' : 'text-[#3d4f6b] hover:text-[#9baac0]',
-                            col.align === 'right' ? 'text-right' : 'text-left',
-                            col.thClass,
-                            col.mobileHide ? 'hidden sm:table-cell' : '',
-                          ].join(' ')}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => toggleSort(col.key)}
-                            className={`inline-flex w-full items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded ${col.align === 'right' ? 'flex-row-reverse justify-start' : 'text-left'}`}
+                {/* Dải thống kê */}
+                {!loading && (
+                  <p className="border-b border-[var(--fs-line)] px-5 py-2.5 text-[13px] text-[var(--fs-muted)]">
+                    Trong {displayed.length} mã đang lọc:{' '}
+                    <span className="tabular-nums" style={{ color: 'var(--fs-up)' }}>{counts.up} tăng</span>,{' '}
+                    <span className="tabular-nums" style={{ color: 'var(--fs-flat)' }}>{counts.flat} đứng</span>,{' '}
+                    <span className="tabular-nums" style={{ color: 'var(--fs-down)' }}>{counts.down} giảm</span>.
+                  </p>
+                )}
+
+                {!loading && displayed.length === 0 ? (
+                  <EmptyState
+                    title="Không có mã phù hợp"
+                    hint="Thử bỏ bớt điều kiện lọc."
+                    action={filtersActive ? { label: 'Xoá bộ lọc', onClick: clearFilters } : undefined}
+                  />
+                ) : (
+                  <table className="w-full border-collapse text-left text-[14px]">
+                    <thead>
+                      <tr className="border-b border-[var(--fs-line)] text-[12px] text-[var(--fs-muted)]">
+                        {COLUMNS.map((col) => (
+                          <th
+                            key={col.key}
+                            scope="col"
+                            aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                            className={`px-3 py-2 font-normal first:pl-5 last:pr-5 ${col.align === 'right' ? 'text-right' : 'text-left'} ${col.show}`}
                           >
-                            {col.label}<SortIcon col={col.key} sortKey={sortKey} sortDir={sortDir} />
-                          </button>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <ScreenerSkeleton />
-                    ) : displayed.length === 0 ? (
-                      <tr>
-                        <td colSpan={COLUMNS.length} className="py-14 text-center text-sm text-[#7a8ba8]">
-                          Không có kết quả phù hợp.
-                        </td>
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(col.key)}
+                              className={`inline-flex items-center gap-1 rounded hover:text-[var(--fs-ink)] ${sortKey === col.key ? 'font-medium text-[var(--fs-ink)]' : ''} ${col.align === 'right' ? 'flex-row-reverse' : ''}`}
+                            >
+                              {col.label}
+                              <SortIcon col={col.key} sortKey={sortKey} sortDir={sortDir} />
+                            </button>
+                          </th>
+                        ))}
                       </tr>
-                    ) : (
-                      displayed.map((stock) => {
-                        const pct    = stock.percent_change
-                        const isUp   = (pct ?? 0) > 0
-                        const isDown = (pct ?? 0) < 0
-                        const strong = Math.abs(pct ?? 0) >= 3
-                        const cc     = isUp ? 'text-[#34d399]' : isDown ? 'text-[#f87171]' : 'text-[#7a8ba8]'
-
-                        return (
-                          <tr key={stock.symbol} className="data-row group">
-                            {/* Mã */}
-                            <td className={`py-2.5 ${COLUMNS[0].tdClass}`}>
-                              <Link
-                                href={`/stock/${stock.symbol}`}
-                                className="text-sm font-bold font-mono tracking-tight text-foreground group-hover:text-primary transition-colors"
-                              >
-                                {stock.symbol}
-                              </Link>
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <ScreenerSkeleton />
+                      ) : (
+                        displayed.map((stock) => (
+                          <tr key={stock.symbol} className="border-b border-[var(--fs-line)] last:border-0 hover:bg-[var(--fs-surface)]">
+                            <td className="px-3 py-2.5 pl-5">
+                              <Link href={`/stock/${stock.symbol}`} className="font-medium">{stock.symbol}</Link>
+                              {stock.name && <div className="max-w-[160px] truncate text-[12px] text-[var(--fs-muted)]">{stock.name}</div>}
                             </td>
-
-                            {/* Sàn */}
-                            <td className={`py-2.5 ${COLUMNS[1].tdClass} hidden sm:table-cell`}>
-                              <span className={[
-                                'text-[10px] font-semibold px-1.5 py-0.5 rounded border leading-none inline-block',
-                                EXCH_STYLE[stock.exchange] ?? 'bg-[#1a2744] text-[#7a8ba8] border-[#1e3158]',
-                              ].join(' ')}>
-                                {stock.exchange}
-                              </span>
-                            </td>
-
-                            {/* Ngành */}
-                            <td className={`py-2.5 ${COLUMNS[2].tdClass} hidden sm:table-cell text-xs text-[#7a8ba8] truncate max-w-[160px]`}>
-                              {stock.sector}
-                            </td>
-
-                            {/* Giá */}
-                            <td className={`py-2.5 ${COLUMNS[3].tdClass} text-right text-xs tabular font-medium text-foreground`}>
-                              {fmtPrice(stock.current_price)}
-                            </td>
-
-                            {/* Thay đổi VND */}
-                            <td className={`py-2.5 ${COLUMNS[4].tdClass} hidden sm:table-cell text-right text-xs tabular font-medium ${cc}`}>
-                              {fmtChange(stock.price_change)}
-                            </td>
-
-                            {/* % */}
-                            <td className={`py-2.5 ${COLUMNS[5].tdClass} text-right`}>
-                              {pct == null ? (
-                                <span className="text-xs text-[#3d4f6b]">-</span>
-                              ) : strong ? (
-                                <span className={[
-                                  'inline-block tabular font-bold text-[11px] px-1.5 py-0.5 rounded leading-none',
-                                  isUp ? 'bg-[#34d399] text-[#052e16]' : 'bg-[#f87171] text-white',
-                                ].join(' ')}>
-                                  {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
-                                </span>
-                              ) : (
-                                <span className={`text-xs tabular font-semibold ${cc}`}>
-                                  {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
-                                </span>
-                              )}
-                            </td>
-
-                            {/* KL */}
-                            <td className={`py-2.5 ${COLUMNS[6].tdClass} text-right text-xs tabular text-[#7a8ba8]`}>
-                              {fmtVol(stock.volume)}
-                            </td>
+                            <td className="hidden max-w-[160px] truncate px-3 py-2.5 text-[13px] text-[var(--fs-ink-2)] md:table-cell">{stock.sector || '–'}</td>
+                            <td className="hidden px-3 py-2.5 text-[13px] text-[var(--fs-ink-2)] sm:table-cell">{stock.exchange}</td>
+                            <td className="px-3 py-2.5 text-right tabular-nums">{fmtPrice(stock.current_price, 0)}</td>
+                            <td className="px-3 py-2.5 text-right"><Change value={stock.percent_change} /></td>
+                            <td className="hidden px-3 py-2.5 text-right tabular-nums md:table-cell">{fmtCompact(stock.trading_value)}</td>
+                            <td className="hidden px-3 py-2.5 text-right tabular-nums lg:table-cell">{fmtCompact(stock.market_cap)}</td>
+                            <td className="hidden px-3 py-2.5 text-right tabular-nums lg:table-cell">{fmtPrice(stock.pe, 1)}</td>
+                            <td className="hidden px-3 py-2.5 pr-5 text-right tabular-nums lg:table-cell">{fmtPrice(stock.pb, 1)}</td>
                           </tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="border-t border-[#0f1f3d] px-4 py-2 text-[10px] text-[#7a8ba8]" aria-live="polite">
-                Nguồn: {dataSource ?? 'API FinSight'}
-                {lastUpdated && <> · Dữ liệu đến {formatDataAsOf(lastUpdated)}</>}
-                {syntheticData && ' · Dữ liệu minh họa'}
-              </div>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </Panel>
+            </div>
+
+            <div className="min-w-0 space-y-4">
+              <BreadthPanel breadth={breadth} loading={loading} onExplain={handleExplain} />
+              <SectorPanel leading={sectors?.leading ?? []} weak={sectors?.weak ?? []} loading={loading} onExplain={handleExplain} />
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-4">
-            <BreadthPanel breadth={breadth} loading={loading} onExplain={handleExplain} />
-            <SectorPanel leading={sectors?.leading ?? []} weak={sectors?.weak ?? []} loading={loading} onExplain={handleExplain} />
-          </div>
-        </div>
+          <p className="mt-10 text-[12px] text-[var(--fs-muted)]">
+            Thông tin chỉ mang tính tham khảo, không phải khuyến nghị đầu tư.
+          </p>
+        </main>
       </div>
 
       <ExplainPanel isOpen={explainOpen} onClose={() => setExplainOpen(false)} request={explainReq} />
