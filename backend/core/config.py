@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     openrouter_model: str = "deepseek/deepseek-chat-v3.1"
     jwt_secret: str = "local-development-only-change-before-deploy"
     vnstock_api_key: str | None = None
+    vnstock_symbols: str = "VCB,ACB,MBB,BID,FPT,CMG,SSI,VRE,DXG,PVD,POW,GAS,HPG,SAB,KDC"
+    vnstock_request_delay_seconds: float = Field(default=6.0, ge=0)
 
     @field_validator("database_url", mode="before")
     @classmethod

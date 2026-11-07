@@ -119,10 +119,13 @@ Truy cập http://localhost:3000.
 | `BACKEND_API_URL` | Backend upstream cho Next.js proxy; unified Docker mặc định dùng localhost nội bộ | Không |
 | `DATABASE_URL` | Chuỗi kết nối PostgreSQL async | Không khi chạy bằng Compose |
 | `REDIS_URL` | Redis URL; readiness kiểm tra nếu được cấu hình | Không |
-| `MARKET_PROVIDER` | `csv` (mặc định, synthetic demo) hoặc `vnstock` (cục bộ, cần quyền truy cập phù hợp) | Không |
+| `MARKET_PROVIDER` | `csv` (mặc định, synthetic demo) hoặc `vnstock` (thử nghiệm cục bộ; xem `backend/VNSTOCK_SETUP.md`) | Không |
 | `NEWS_FEED_ENABLED` | `true` bật RSS VnExpress/VnEconomy cho API và worker; tắt bằng `false` | Không |
 | `JWT_SECRET` | Secret ký access token; production phải dùng chuỗi ngẫu nhiên riêng | Có ở production |
-| `VNSTOCK_API_KEY` | Key vnstock khi adapter cục bộ yêu cầu; không cấu hình cho public demo | Tùy chọn |
+| `VNSTOCK_API_KEY` | Key Community miễn phí cho adapter cục bộ; không cấu hình cho public demo | Tùy chọn |
+| `INSTALL_VNSTOCK` | Đặt `true` để cài gói Vnstock vào image Docker cục bộ | Không |
+| `VNSTOCK_SYMBOLS` | Danh sách 15 mã mặc định cho ingest Vnstock; giữ nhỏ để không vượt quota | Không |
+| `VNSTOCK_REQUEST_DELAY_SECONDS` | Khoảng nghỉ giữa các lần lấy lịch sử cổ phiếu (mặc định 6 giây) | Không |
 
 ---
 

@@ -1,24 +1,16 @@
-# Vnstock provider setup
+# Vnstock Community for local research
 
-FinSight keeps vnstock as an optional development provider behind `providers/vnstock_provider.py`. It is excluded from the public/demo container dependencies. Install the optional package locally only if your account tier permits the required features.
+FinSight can use Vnstock Community for a private, local run. The default and public deployment still use labeled CSV demo data. Community is free but needs a Vnstock API key; an unregistered Guest session cannot call the adapter's `list_by_exchange()` route. Vnstock does not grant rights to store or publish its upstream sources' data.
 
-## Local setup
+## One-time setup
 
-```powershell
-cd backend
-py -m venv .venv
-& .\.venv\Scripts\python.exe -m pip install -r requirements-vnstock.txt
-```
+1. Create a free Community account and get an API key at <https://vnstocks.com/account#api-key>. Do not put the key in Git or chat.
+2. Copy the root `.env.example` to `.env`, then set `VNSTOCK_API_KEY=<your key>`, `MARKET_PROVIDER=vnstock`, and `INSTALL_VNSTOCK=true`. The `.env` file is ignored by Git.
+3. Start Docker Desktop, then run `docker compose up --build -d` from the repo root. Check `docker compose ps` and `docker compose logs worker --tail 40`.
+4. Open `http://localhost:8000/api/v1/market/data-status` and `http://localhost:3000`. The source must be `vnstock`, not `csv-demo`.
 
-Some reference endpoints require an entitlement beyond guest access. The current `VnstockProvider` symbol-list call returned an entitlement error without credentials. Set `VNSTOCK_API_KEY` only when you have an eligible account/key, and never commit that key. Installing the optional adapter does not grant permission to display or redistribute upstream data.
+For a Python-only setup, install both `requirements.txt` and `requirements-vnstock.txt` into `backend/.venv` and set the same environment variables. The optional package is pinned at 5.2.1. It is not installed in the public image by default.
 
-## Data source methods
+The Compose services share the `vnstock_auth` volume so the Vnstock device identity survives container rebuilds and both services use the same identity. Community permits one device. The adapter limits ingestion to the 15 tickers in `VNSTOCK_SYMBOLS` and three indices. Change that list only after checking your account's quota. `VNSTOCK_REQUEST_DELAY_SECONDS` defaults to 6 between stock-history calls. Initial sync requests two years of daily history; the Community tier permits up to about eight years, subject to current policy. VCI equity OHLCV is already adjusted for corporate actions and quoted in thousands of VND; FinSight stores it in VND. Index OHLCV stays in index points. Any tier-truncated history is rejected rather than stored as complete.
 
-- Symbol directory: `Reference().equity.list_by_exchange()` and `list_by_industry()`.
-- Daily stock history: `Market().equity(symbol).ohlcv(source="vci")`.
-- Index history: `Market().index(symbol).ohlcv()`.
-- Batch quote board: `Market().quote(symbols)`.
-
-The exact columns and source coverage can change upstream. All calls are isolated in the provider adapter and recorded in stored bar `source` fields. Do not treat delayed provider values as exchange realtime data.
-
-For a reproducible local or public demo without upstream access, use `MARKET_PROVIDER=csv`; this is the default. The checked-in CSV history is synthetic demo data and is labeled `csv-demo` in storage. Do not silently fall back to it when a real provider fails.
+Data methods: `Reference().equity.list_by_exchange()` for the ticker directory; `Market().equity(symbol).ohlcv(source="vci")` for adjusted daily stock history; `Market().index(symbol).ohlcv()` for index history. This is end-of-day history, not a real-time exchange feed. If the provider fails, FinSight must show an error or stale state, never silently use synthetic prices.

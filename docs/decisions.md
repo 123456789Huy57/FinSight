@@ -129,4 +129,10 @@
 
 ## FE-43a: đơn vị cổ tức
 - `fundamentals.dividend_yield` là `Numeric(9,4)`, API trả nguyên giá trị; hiện chưa có seed hay provider nào ghi cột này. Quy ước chốt: lưu dạng phân số (0,028 = 2,8%), giao diện nhân 100 khi hiển thị. Provider ghi cột này sau này phải theo quy ước đó.
+
+## BE: Vnstock Community cho bản chạy cục bộ (07/11/2026)
+- Chủ dự án chọn Vnstock Community thay DNSE cho giai đoạn thử nghiệm cá nhân/đồ án. Luồng DNSE trong `docs/BACKEND_PLAN.md` tạm dừng; không coi key Community là quyền công bố dữ liệu của VCI/KBS.
+- Adapter hiện dùng VCI cho giá cổ phiếu và Vnstock mặc định cho chỉ số. Theo tài liệu Vnstock, VCI OHLCV là giá đã điều chỉnh theo sự kiện quyền, đơn vị nghìn đồng; lưu `close` và `adjusted_close` bằng đồng. Vì nguồn không trả riêng giá đóng cửa chưa điều chỉnh qua OHLCV này, biểu đồ lịch sử hiển thị chuỗi đã điều chỉnh.
+- Chỉ ingest 15 mã được cấu hình, ba chỉ số, và giới hạn nhịp gọi. Bản public/Render vẫn dùng `csv-demo`; trước khi hiển thị giá thật công khai cần xác nhận quyền lưu và hiển thị từ chủ nguồn dữ liệu.
+- Kiểm tra trực tiếp với Vnstock 5.2.1 chưa có key trả `EntitlementError` cho `reference.market.symbols_by_exchange`; cần khóa Community miễn phí để hoàn tất kiểm tra end-to-end.
 - T+1/T+5 chỉ hiện số khi `status=measured`, `dataMode=market-provider` và có `methodVersion`; còn lại hiện "Dữ liệu minh hoạ" (hàm `reactionLabel` trong `lib/reactions.ts`).

@@ -7,6 +7,7 @@ import uuid
 import pandas as pd
 from sqlalchemy.dialects.postgresql import insert
 
+from core.config import settings
 from db.models import IndexBar, PriceBar, ProviderJobRun, Symbol
 from db.session import AsyncSessionLocal
 from domain.text import normalize_vi
@@ -24,6 +25,11 @@ def _float(value: Any) -> float | None:
         return number if pd.notna(number) and math.isfinite(number) else None
     except (TypeError, ValueError):
         return None
+
+
+def _scaled_float(value: Any, scale: float) -> float | None:
+    number = _float(value)
+    return number * scale if number is not None else None
 
 
 def _bars_for(
@@ -62,13 +68,14 @@ def _bars_for(
         if close <= 0:
             continue
         volume = _float(row.get(volume_col)) if volume_col else None
-        adjusted_close = _float(row.get(adjusted_close_col)) * scale if adjusted_close_col else None
+        adjusted_close = _scaled_float(row.get(adjusted_close_col), scale) if adjusted_close_col else None
         if adjusted_close is not None and adjusted_close <= 0:
             adjusted_close = None
         records_by_date[timestamp.date()] = {
             "symbol": symbol,
             "trade_date": timestamp.date(),
-            **{key: (_float(row.get(column)) * scale if column else None) for key, column in price_columns.items()},
+            **{key: _scaled_float(row.get(column), scale) if column else None
+               for key, column in price_columns.items()},
             "volume": int(volume) if volume is not None and math.isfinite(volume) else None,
             "adjusted_close": adjusted_close,
             "source": provider.source_id,
@@ -80,9 +87,12 @@ async def ingest_price_history(
     start: date,
     end: date,
     symbols: list[str] | None = None,
-    request_delay_seconds: float = 0.15,
+    request_delay_seconds: float | None = None,
 ) -> dict[str, int | str]:
     provider = get_market_provider()
+    if request_delay_seconds is None:
+        request_delay_seconds = (settings.vnstock_request_delay_seconds
+                                 if provider.source_id == "vnstock" else 0.15)
     run_id = str(uuid.uuid4())
     async with AsyncSessionLocal.begin() as session:
         session.add(ProviderJobRun(

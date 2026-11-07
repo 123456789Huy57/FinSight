@@ -9,7 +9,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Backfill daily stock bars into PostgreSQL")
     parser.add_argument("--years", type=int, default=5, help="History window (1-20 years)")
     parser.add_argument("--symbol", action="append", help="Limit to a ticker; repeat to select multiple")
-    parser.add_argument("--delay", type=float, default=0.15, help="Delay between provider requests")
+    parser.add_argument("--delay", type=float, default=None, help="Delay between provider requests (provider default if omitted)")
     return parser.parse_args()
 
 
@@ -21,7 +21,7 @@ async def main() -> None:
         start=date.today() - timedelta(days=args.years * 366),
         end=date.today(),
         symbols=args.symbol,
-        request_delay_seconds=max(0, args.delay),
+        request_delay_seconds=max(0, args.delay) if args.delay is not None else None,
     )
     print(summary)
 

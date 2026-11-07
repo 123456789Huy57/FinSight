@@ -22,8 +22,7 @@ class VnstockProvider(MarketDataProvider):
 
     source_id = "vnstock"
     data_mode = "market-provider"
-    # Preserve the previous VCI normalization assumption explicitly. Verify
-    # this against an entitled live response before enabling this provider.
+    # Vnstock documents VCI equity OHLCV in thousands of VND.
     stock_price_multiplier = 1000.0
 
     def list_symbols(self) -> pd.DataFrame:
@@ -41,7 +40,11 @@ class VnstockProvider(MarketDataProvider):
         except (KeyError, AttributeError, ValueError):
             frame["sector"] = None
         columns = [column for column in ("symbol", "name", "exchange", "sector") if column in frame]
-        return frame[columns].drop_duplicates("symbol").reset_index(drop=True)
+        selected = {symbol.strip().upper() for symbol in settings.vnstock_symbols.split(",") if symbol.strip()}
+        if not selected:
+            raise ValueError("VNSTOCK_SYMBOLS must contain at least one ticker")
+        filtered = frame.loc[frame["symbol"].astype(str).str.upper().isin(selected), columns]
+        return filtered.drop_duplicates("symbol").reset_index(drop=True)
 
     def get_quote_snapshot(self, symbols: list[str]) -> pd.DataFrame:
         if not symbols:
@@ -53,9 +56,17 @@ class VnstockProvider(MarketDataProvider):
         if interval != "1D":
             raise ValueError("vnstock adapter currently supports daily bars only")
         market, _ = _vnstock_types()
-        return market().equity(symbol.upper()).ohlcv(
+        frame = market().equity(symbol.upper()).ohlcv(
             start=start.isoformat(), end=end.isoformat(), interval=interval, source="vci"
         )
+        if frame is not None and any(key.startswith("tier_cap_") for key in frame.attrs):
+            raise RuntimeError("Vnstock history was truncated by the account tier")
+        if frame is not None and not frame.empty:
+            # VCI OHLCV is already adjusted for corporate actions. Preserve that
+            # provenance for event studies; the close field also backs the chart.
+            frame = frame.copy()
+            frame["adjusted_close"] = frame["close"]
+        return frame
 
     def get_index_snapshot(self) -> pd.DataFrame:
         market, _ = _vnstock_types()
@@ -73,7 +84,10 @@ class VnstockProvider(MarketDataProvider):
 
     def get_index_history(self, symbol: str, start: date, end: date) -> pd.DataFrame:
         market, _ = _vnstock_types()
-        return market().index(symbol.upper()).ohlcv(start=start.isoformat(), end=end.isoformat())
+        frame = market().index(symbol.upper()).ohlcv(start=start.isoformat(), end=end.isoformat())
+        if frame is not None and any(key.startswith("tier_cap_") for key in frame.attrs):
+            raise RuntimeError("Vnstock index history was truncated by the account tier")
+        return frame
 
     def get_company_profile(self, symbol: str) -> dict[str, str | None]:
         frame = self.list_symbols()

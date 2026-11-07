@@ -29,8 +29,12 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_VNSTOCK: ${INSTALL_VNSTOCK:-false}
     ports:
       - "8000:8000"
+    volumes:
+      - vnstock_auth:/data/vnstock
     command: ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
@@ -38,6 +42,9 @@ services:
       - DATABASE_URL=postgresql+asyncpg://finsight:finsight@db:5432/finsight
       - REDIS_URL=redis://redis:6379/0
       - MARKET_PROVIDER=${MARKET_PROVIDER:-csv}
+      - VNSTOCK_API_KEY=${VNSTOCK_API_KEY:-}
+      - VNSTOCK_SYMBOLS=${VNSTOCK_SYMBOLS:-VCB,ACB,MBB,BID,FPT,CMG,SSI,VRE,DXG,PVD,POW,GAS,HPG,SAB,KDC}
+      - VNSTOCK_REQUEST_DELAY_SECONDS=${VNSTOCK_REQUEST_DELAY_SECONDS:-6}
       - NEWS_FEED_ENABLED=${NEWS_FEED_ENABLED:-true}
       - RUN_SNAPSHOT_JOBS=false
     depends_on:
@@ -56,13 +63,20 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_VNSTOCK: ${INSTALL_VNSTOCK:-false}
     command: ["python", "worker.py"]
+    volumes:
+      - vnstock_auth:/data/vnstock
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_MODEL=deepseek/deepseek-chat-v3.1
       - DATABASE_URL=postgresql+asyncpg://finsight:finsight@db:5432/finsight
       - REDIS_URL=redis://redis:6379/0
       - MARKET_PROVIDER=${MARKET_PROVIDER:-csv}
+      - VNSTOCK_API_KEY=${VNSTOCK_API_KEY:-}
+      - VNSTOCK_SYMBOLS=${VNSTOCK_SYMBOLS:-VCB,ACB,MBB,BID,FPT,CMG,SSI,VRE,DXG,PVD,POW,GAS,HPG,SAB,KDC}
+      - VNSTOCK_REQUEST_DELAY_SECONDS=${VNSTOCK_REQUEST_DELAY_SECONDS:-6}
       - NEWS_FEED_ENABLED=${NEWS_FEED_ENABLED:-true}
       - RUN_SNAPSHOT_JOBS=true
     depends_on:
@@ -85,3 +99,4 @@ services:
 
 volumes:
   postgres_data:
+  vnstock_auth:

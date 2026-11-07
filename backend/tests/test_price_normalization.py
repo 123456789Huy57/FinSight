@@ -69,6 +69,26 @@ def test_index_points_are_not_scaled_by_stock_price_multiplier():
     assert bars[0]["close"] == 1_500.25
 
 
+def test_nan_fields_do_not_drop_an_entire_symbol():
+    provider = SimpleNamespace(source_id="vnstock", stock_price_multiplier=1000.0)
+    frame = pd.DataFrame({
+        "time": ["2026-11-04", "2026-11-05", "2026-11-06"],
+        "open": [float("nan"), 62.0, 63.0],
+        "high": [63.0, float("nan"), 64.0],
+        "low": [61.0, 61.0, float("nan")],
+        "close": [62.5, float("nan"), 63.5],
+        "adj_close": [float("nan"), 61.0, 62.0],
+    })
+
+    bars = _bars_for("FPT", frame, provider)
+
+    assert len(bars) == 2
+    assert bars[0]["open"] is None
+    assert bars[0]["adjusted_close"] is None
+    assert bars[1]["low"] is None
+    assert bars[1]["adjusted_close"] == 62_000
+
+
 def test_market_data_status_distinguishes_missing_current_and_stale_data():
     assert market_data_status(False, None) == ("no_data", False)
     assert market_data_status(True, "success") == ("current", False)
