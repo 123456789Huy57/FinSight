@@ -9,6 +9,7 @@ try:
 except Exception:  # pragma: no cover - fallback if tzdata missing
     _VN_TZ = None
 
+from core.config import settings
 from providers.factory import get_market_provider
 from services.news_service import fetch_news_items
 
@@ -1045,6 +1046,7 @@ def get_data_sources() -> dict:
         },
         "history": "Configured provider daily OHLCV; vnstock v5 uses Market.equity().ohlcv()",
         "news": "RSS feeds from VnExpress and VnEconomy by default",
+        "ai_enabled": bool(settings.openrouter_api_key),
         "ai": {
             "commentary": "OpenRouter if OPENROUTER_API_KEY is set, otherwise deterministic fallback",
             "chat": "OpenRouter if OPENROUTER_API_KEY is set, otherwise deterministic fallback",

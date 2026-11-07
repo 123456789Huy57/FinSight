@@ -3,6 +3,7 @@
 import { MessageCircle, X, Send, Loader2, Sparkles, Trash2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { chatWithAI } from '@/lib/api'
+import { useAiEnabled } from '@/lib/useAiEnabled'
 
 interface Message {
   role: 'user' | 'ai'
@@ -14,6 +15,7 @@ interface ChatWidgetProps {
 }
 
 export function ChatWidget({ contextData }: ChatWidgetProps) {
+  const aiEnabled = useAiEnabled()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', text: 'Hỏi về một mã, ngành hoặc bản tin.' },
@@ -42,6 +44,8 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
     }
   }
+
+  if (!aiEnabled) return null
 
   return (
     <>

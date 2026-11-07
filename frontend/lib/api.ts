@@ -325,6 +325,7 @@ export type ScreenerResponse = {
 }
 
 export type DataSourcesResponse = {
+  ai_enabled?: boolean
   market: {
     indices: string
     quote: string

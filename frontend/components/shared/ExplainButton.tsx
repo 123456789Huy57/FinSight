@@ -1,6 +1,7 @@
 'use client'
 
 import { Sparkles } from 'lucide-react'
+import { useAiEnabled } from '@/lib/useAiEnabled'
 
 interface ExplainButtonProps {
   onClick: () => void
@@ -10,6 +11,8 @@ interface ExplainButtonProps {
 }
 
 export function ExplainButton({ onClick, label, size = 'sm', className = '' }: ExplainButtonProps) {
+  const aiEnabled = useAiEnabled()
+  if (!aiEnabled) return null
   if (size === 'md') {
     return (
       <button
@@ -21,7 +24,7 @@ export function ExplainButton({ onClick, label, size = 'sm', className = '' }: E
           cursor-pointer select-none ${className}`}
       >
         <Sparkles className="w-3.5 h-3.5" />
-        {label ?? 'AI Explain'}
+        {label ?? 'Giải thích'}
       </button>
     )
   }

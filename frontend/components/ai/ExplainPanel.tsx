@@ -4,6 +4,7 @@ import { X, Sparkles, TrendingUp, ShieldAlert, Eye, Zap, Cpu, BookOpen, Loader2 
 import { useEffect, useState, useMemo } from 'react'
 import type { AIExplainRequest, AIExplainResponse } from '@/lib/api'
 import { explainItem } from '@/lib/api'
+import { useAiEnabled } from '@/lib/useAiEnabled'
 
 function buildFallback(req: AIExplainRequest | null): AIExplainResponse | null {
   if (!req) return null
@@ -48,6 +49,7 @@ interface Props {
 }
 
 export function ExplainPanel({ isOpen, onClose, request }: Props) {
+  const aiEnabled = useAiEnabled()
   const [data, setData] = useState<AIExplainResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const fallback = useMemo(() => buildFallback(request), [request])
@@ -72,7 +74,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
-  if (!isOpen) return null
+  if (!aiEnabled || !isOpen) return null
 
   const active = data ?? (loading ? null : fallback)
 
@@ -271,7 +273,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
         {/* Footer */}
         <div className="px-5 py-3 border-t border-[#1a2744] flex-shrink-0">
           <p className="text-[10px] text-[#3d4f6b] leading-relaxed">
-            Phân tích do AI tạo từ dữ liệu kỹ thuật và cơ bản. Không phải khuyến nghị đầu tư.
+            Giải thích được tạo tự động từ dữ liệu kỹ thuật và cơ bản. Không phải khuyến nghị đầu tư.
           </p>
         </div>
       </div>
