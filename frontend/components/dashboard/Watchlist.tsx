@@ -1,19 +1,16 @@
 'use client'
 
-import { Star, Plus, X, RefreshCw } from 'lucide-react'
+import { Plus, X, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { getQuote } from '@/lib/api'
 import type { Quote } from '@/lib/api'
+import { Panel, Change } from '@/components/fs'
+import { fmtPrice } from '@/lib/format'
 import { accountFetch, ACCESS_TOKEN_KEY } from '@/lib/account'
 
 const STORAGE_KEY = 'finsight_watchlist'
 const DEFAULT_WATCHLIST = ['VCB', 'FPT', 'MWG', 'SSI', 'HPG']
-
-function fmtPrice(v: number | null) {
-  if (v == null) return '-'
-  return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-}
 
 function useWatchlist() {
   const [symbols, setSymbols] = useState<string[]>([])
@@ -114,81 +111,73 @@ export function Watchlist() {
   }
 
   return (
-    <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] overflow-hidden shadow-md shadow-black/40">
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[rgba(79,142,247,0.12)]">
-        <div className="flex items-center gap-2">
-          <Star className="w-3.5 h-3.5 text-[#f59e0b]" strokeWidth={2} fill="currentColor" fillOpacity={0.3} />
-          <span className="text-[13px] font-bold text-foreground">Danh sách theo dõi</span>
-        </div>
+    <Panel
+      title="Danh sách theo dõi"
+      className="lg:col-span-4"
+      aside={
         <button
           type="button"
           onClick={() => void fetchQuotes()}
           disabled={loading}
-          className="p-1 text-[#7a8ba8] hover:text-foreground transition-colors disabled:opacity-40 rounded-md hover:bg-[#1a2744]"
+          aria-label="Làm mới giá"
+          className="rounded-md p-1 hover:bg-[var(--fs-surface)] disabled:opacity-40"
         >
-          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
-      </div>
-
-      <div>
+      }
+    >
+      <ul className="divide-y divide-[var(--fs-line)]">
         {symbols.map((sym) => {
           const q = quotes[sym]
-          const up = (q?.percent_change ?? 0) >= 0
           return (
-            <div
-              key={sym}
-              className="flex items-center justify-between px-3 py-2.5 hover:bg-[#0e1726] transition-colors group border-b border-[#0f1f3d] last:border-0"
-            >
-              <Link
-                href={`/stock/${sym}`}
-                className="text-[13px] font-bold font-mono text-foreground hover:text-primary transition-colors"
-              >
-                {sym}
-              </Link>
-              <div className="flex items-center gap-2.5">
+            <li key={sym} className="group flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-[var(--fs-surface)]">
+              <div className="min-w-0">
+                <Link href={`/stock/${sym}`} className="text-[14px] font-medium">{sym}</Link>
+              </div>
+              <div className="flex items-center gap-3">
                 {q ? (
-                  <>
-                    <span className="text-[11px] text-[#7a8ba8] tabular">{fmtPrice(q.current_price)}</span>
-                    <span className={`text-[12px] font-bold tabular w-[46px] text-right ${up ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
-                      {q.percent_change == null ? '-' : `${up ? '+' : ''}${q.percent_change.toFixed(2)}%`}
-                    </span>
-                  </>
+                  <div className="text-right tabular-nums">
+                    <div className="text-[14px]">{fmtPrice(q.current_price, 0)}</div>
+                    <div className="text-[12px]"><Change value={q.percent_change} /></div>
+                  </div>
                 ) : (
-                  <span className="text-[11px] text-[#3d4f6b]">-</span>
+                  <span className="text-[var(--fs-muted)]">–</span>
                 )}
                 <button
                   type="button"
                   onClick={() => void handleRemove(sym)}
-                  className="opacity-0 group-hover:opacity-100 text-[#3d4f6b] hover:text-[#f87171] transition-all"
+                  aria-label={`Bỏ ${sym} khỏi danh sách`}
+                  className="text-[var(--fs-muted)] opacity-0 hover:text-[var(--fs-ink)] focus:opacity-100 group-hover:opacity-100"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
-            </div>
+            </li>
           )
         })}
-      </div>
+      </ul>
 
-      <form onSubmit={handleAdd} className="px-3 py-2.5 border-t border-[#1a2744] flex gap-2">
+      <form onSubmit={handleAdd} className="flex gap-2 border-t border-[var(--fs-line)] px-5 py-3">
         <input
           type="text"
           value={addInput}
           onChange={(e) => setAddInput(e.target.value.toUpperCase())}
-          placeholder="Thêm mã CK..."
+          placeholder="Thêm mã"
+          aria-label="Thêm mã vào danh sách theo dõi"
           maxLength={10}
-          className="flex-1 bg-[#0e1726] border border-[#1a2744] rounded-lg px-2.5 py-1 text-[12px] text-foreground
-            placeholder:text-[#3d4f6b] focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/25 transition-all"
+          className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--fs-line)] bg-white px-3 text-[14px] outline-none focus:border-[var(--fs-ink)]"
         />
         <button
           type="submit"
-          className="px-2 py-1 bg-primary/10 border border-primary/20 text-primary rounded-lg hover:bg-primary/20 transition-colors"
+          aria-label="Thêm mã"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--fs-line)] hover:bg-[var(--fs-surface)]"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="h-4 w-4" />
         </button>
       </form>
-      <div className="border-t border-[#1a2744] px-3 py-2 text-[11px] text-[#7a8ba8]">
-        {token ? 'Watchlist đang đồng bộ với tài khoản.' : <Link href="/account" className="hover:text-primary">Đăng nhập để đồng bộ watchlist và quản lý danh mục →</Link>}
+      <div className="border-t border-[var(--fs-line)] px-5 py-3 text-[12px] text-[var(--fs-muted)]">
+        {token ? 'Danh sách đang đồng bộ với tài khoản.' : <Link href="/account" className="text-[var(--fs-signal)]">Đăng nhập để đồng bộ danh sách theo dõi</Link>}
       </div>
-    </div>
+    </Panel>
   )
 }

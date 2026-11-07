@@ -11,9 +11,10 @@ import { Watchlist } from '@/components/dashboard/Watchlist'
 import { NewsPanel } from '@/components/dashboard/NewsPanel'
 import { ExplainPanel } from '@/components/ai/ExplainPanel'
 import { ChatWidget } from '@/components/ai/ChatWidget'
+import { PageHeader } from '@/components/fs'
+import { MarketHeatmapLive } from '@/components/market/MarketHeatmapLive'
 import { MarketStatusBadge } from '@/components/shared/MarketStatusBadge'
 import { useMarketPolling } from '@/lib/useMarketPolling'
-import { formatDataAsOf } from '@/lib/format'
 
 import {
   getMarketIndices,
@@ -150,79 +151,74 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="max-w-screen-2xl mx-auto px-4 lg:px-6 py-4 space-y-4">
+      <div className="min-h-screen bg-[var(--fs-surface)] text-[var(--fs-ink)]">
+        <main className="mx-auto max-w-[1240px] px-4 pb-20 pt-8 sm:px-6">
+          <PageHeader
+            title="Tổng quan thị trường"
+            dataMode={indices[0]?.data_mode}
+            asOf={lastUpdated}
+            source={indices[0]?.source}
+            actions={
+              <>
+                <MarketStatusBadge status={marketStatus} />
+                <button
+                  type="button"
+                  onClick={() => void fetchMain()}
+                  disabled={loadingMain}
+                  className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--fs-line)] bg-white px-3 text-[13px] hover:bg-[var(--fs-surface)] disabled:opacity-40"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingMain ? 'animate-spin' : ''}`} />
+                  Làm mới
+                </button>
+              </>
+            }
+          />
 
-        {/* Status bar */}
-        {syntheticData && (
-          <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            Dữ liệu minh họa tổng hợp, không phải giá thị trường thật.
+          {syntheticData && (
+            <p role="status" className="mt-3 text-[13px] text-[var(--fs-ink-2)]">
+              Đây là dữ liệu minh hoạ, không phải giá thị trường thật.
+            </p>
+          )}
+
+          <div className="mt-6 space-y-4">
+            <IndexStrip indices={indices} onExplain={handleExplain} />
+
+            <MarketHeatmapLive height={480} />
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+              <NewsPanel
+                className="lg:col-span-8"
+                items={news}
+                loading={loadingNews}
+                onExplain={handleExplain}
+              />
+
+              <div className="min-w-0 space-y-4 lg:col-span-4">
+                <BreadthPanel breadth={breadth} loading={loadingMain} onExplain={handleExplain} />
+                <SectorPanel
+                  leading={sectors?.leading ?? []}
+                  weak={sectors?.weak ?? []}
+                  loading={loadingMain}
+                  onExplain={handleExplain}
+                />
+                <CommentaryPanel commentary={commentary} loading={loadingCommentary} onExplain={handleExplain} />
+              </div>
+
+              <MoversPanel
+                gainers={gainers}
+                losers={losers}
+                mostActive={mostActive?.stocks}
+                loading={loadingMain}
+                onExplain={handleExplain}
+              />
+              <Watchlist />
+            </div>
           </div>
-        )}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <MarketStatusBadge status={marketStatus} />
-            <span className="text-[11px] text-[#3d4f6b]">
-              {lastUpdated
-                ? `Dữ liệu phiên ${formatDataAsOf(lastUpdated)}`
-                : 'Đang tải...'}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => void fetchMain()}
-            disabled={loadingMain}
-            className="flex items-center gap-1.5 text-[11px] text-[#7a8ba8] hover:text-foreground transition-colors disabled:opacity-40 px-2 py-1 rounded-md hover:bg-[#0e1726]"
-          >
-            <RefreshCw className={`w-3 h-3 ${loadingMain ? 'animate-spin' : ''}`} />
-            Làm mới
-          </button>
-        </div>
 
-        {/* Index strip */}
-        <IndexStrip indices={indices} onExplain={handleExplain} />
-
-        {/* Main 3-col grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-          {/* Left — wider column */}
-          <div className="lg:col-span-2 space-y-4">
-            <CommentaryPanel
-              commentary={commentary}
-              loading={loadingCommentary}
-              onExplain={handleExplain}
-            />
-
-            <MoversPanel
-              gainers={gainers}
-              losers={losers}
-              mostActive={mostActive?.stocks}
-              loading={loadingMain}
-              onExplain={handleExplain}
-            />
-
-            <NewsPanel
-              items={news}
-              loading={loadingNews}
-              onExplain={handleExplain}
-            />
-          </div>
-
-          {/* Right sidebar */}
-          <div className="space-y-4">
-            <BreadthPanel
-              breadth={breadth}
-              loading={loadingMain}
-              onExplain={handleExplain}
-            />
-            <SectorPanel
-              leading={sectors?.leading ?? []}
-              weak={sectors?.weak ?? []}
-              loading={loadingMain}
-              onExplain={handleExplain}
-            />
-            <Watchlist />
-          </div>
-        </div>
+          <p className="mt-10 text-[12px] text-[var(--fs-muted)]">
+            Thông tin chỉ mang tính tham khảo, không phải khuyến nghị đầu tư.
+          </p>
+        </main>
       </div>
 
       <ExplainPanel

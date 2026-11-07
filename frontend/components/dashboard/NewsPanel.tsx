@@ -1,111 +1,101 @@
 'use client'
 
-import { Newspaper, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
-import type { NewsItem, AIExplainRequest } from '@/lib/api'
+import type { NewsItem, NewsReaction, AIExplainRequest } from '@/lib/api'
 import { ExplainButton } from '@/components/shared/ExplainButton'
 import { Skeleton } from '@/components/shared/Skeleton'
-import { classifyImpact, formatNewsTime } from '@/components/news/NewsCard'
+import { Panel, Change, SymbolChip, EmptyState } from '@/components/fs'
+import { formatNewsTime } from '@/components/news/NewsCard'
 
-const IMPACT_STYLE = {
-  positive: 'bg-primary/10 text-primary border-primary/25',
-  negative: 'bg-[#fbbf24]/10 text-[#fbbf24] border-[#fbbf24]/25',
-  watch:    'bg-[#f59e0b]/8 text-[#f59e0b] border-[#f59e0b]/20',
-  neutral:  'bg-[#1a2744] text-[#7a8ba8] border-[#1e3158]',
-}
-
-function SmallImpactBadge({ impact }: { impact: string }) {
-  const cls = classifyImpact(impact)
-  return (
-    <span className={`text-[9px] font-semibold px-1.5 py-px rounded border leading-none whitespace-nowrap ${IMPACT_STYLE[cls]}`}>
-      {impact}
-    </span>
-  )
+function Reaction({ r }: { r: NewsReaction | undefined }) {
+  if (!r) return <span className="text-[var(--fs-muted)]">–</span>
+  switch (r.status) {
+    case 'measured':
+      return <Change value={r.t1.abnormalReturnPct} />
+    case 'pending':
+      return <span className="text-[var(--fs-muted)]">Chờ</span>
+    case 'insufficient_data':
+      return <span className="text-[var(--fs-muted)]">Chưa đủ dữ liệu</span>
+    case 'overlapping_event':
+      return <span className="text-[var(--fs-muted)]">Trùng tin khác</span>
+    default:
+      return <span className="text-[var(--fs-muted)]">–</span>
+  }
 }
 
 interface NewsPanelProps {
   items: NewsItem[]
   loading?: boolean
   onExplain: (req: AIExplainRequest) => void
+  className?: string
 }
 
-export function NewsPanel({ items, loading, onExplain }: NewsPanelProps) {
+export function NewsPanel({ items, loading, onExplain, className = '' }: NewsPanelProps) {
   return (
-    <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] overflow-hidden shadow-md shadow-black/40">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(79,142,247,0.12)]">
-        <div className="flex items-center gap-2">
-          <Newspaper className="w-3.5 h-3.5 text-primary" strokeWidth={2} />
-          <h2 className="text-[13px] font-bold text-foreground">Tin tức nổi bật</h2>
-        </div>
-        <Link href="/news" className="text-[11px] font-semibold text-primary/60 hover:text-primary transition-colors">
-          Xem tất cả
-        </Link>
-      </div>
-
-      <div>
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="px-4 py-3.5 space-y-2 border-b border-[#0f1f3d] last:border-0">
+    <Panel
+      title="Tin & phản ứng giá"
+      className={className}
+      aside={<Link href="/news" className="text-[var(--fs-signal)]">Xem tất cả</Link>}
+    >
+      {loading ? (
+        <div>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="space-y-2 border-b border-[var(--fs-line)] px-5 py-3.5 last:border-0">
               <Skeleton className="h-3.5 w-3/4" />
               <Skeleton className="h-2.5 w-1/2" />
-              <div className="flex gap-1.5">
-                <Skeleton className="h-4 w-14 rounded" />
-                <Skeleton className="h-4 w-10 rounded" />
-              </div>
             </div>
-          ))
-        ) : items.length === 0 ? (
-          <div className="px-4 py-10 text-center text-[13px] text-[#7a8ba8]">
-            Chưa có tin tức. Đang kết nối...
-          </div>
-        ) : (
-          items.map((item) => (
-            <div key={item.id} className="px-4 py-3.5 hover:bg-[#0e1726] transition-colors group border-b border-[#0f1f3d] last:border-0">
-              {/* Meta row */}
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-semibold text-[#7a8ba8]">{item.source}</span>
-                <span className="text-[#1e3158] text-[10px]">·</span>
-                <span className="text-[10px] text-[#3d4f6b]">{formatNewsTime(item.time)}</span>
-                <SmallImpactBadge impact={item.marketImpact} />
-                {item.url && (
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                    className="ml-auto text-[#3d4f6b] hover:text-primary transition-colors">
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-              </div>
-
-              {/* Headline */}
-              <p className="text-[13px] font-semibold text-foreground leading-snug mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                {item.headline}
-              </p>
-
-              {/* Tickers + explain */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-1">
-                  {item.affectedTickers.slice(0, 4).map((t) => (
-                    <Link
-                      key={t}
-                      href={`/stock/${t}`}
-                      className="text-[10px] font-bold text-primary/75 bg-primary/6 border border-primary/15 rounded px-1.5 py-0.5 hover:bg-primary/15 transition-colors"
-                    >
-                      {t}
-                    </Link>
-                  ))}
-                </div>
-                <ExplainButton
-                  onClick={() => onExplain({
-                    type: 'news', title: item.headline,
-                    context: `Nguồn: ${item.source}. Tác động: ${item.marketImpact}. Mã: ${item.affectedTickers.join(', ')}`,
-                    snapshot: { headline: item.headline, source: item.source, impact: item.marketImpact, tickers: item.affectedTickers.join(', ') },
-                  })}
-                  size="sm"
-                />
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState title="Chưa có tin" hint="Dữ liệu tin sẽ hiện khi nguồn tin sẵn sàng." />
+      ) : (
+        <>
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-[var(--fs-line)] text-[12px] text-[var(--fs-muted)]">
+                <th scope="col" className="px-5 py-2 font-normal">Ngày</th>
+                <th scope="col" className="px-2 py-2 font-normal">Bản tin</th>
+                <th scope="col" className="hidden px-2 py-2 font-normal sm:table-cell">Mã liên quan</th>
+                <th scope="col" className="px-5 py-2 text-right font-normal">Phiên sau</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.slice(0, 8).map((item) => (
+                <tr key={item.id} className="border-b border-[var(--fs-line)] align-top last:border-0 hover:bg-[var(--fs-surface)]">
+                  <td className="whitespace-nowrap px-5 py-3 tabular-nums text-[var(--fs-muted)]">{formatNewsTime(item.time)}</td>
+                  <td className="min-w-0 px-2 py-3">
+                    <div className="flex items-start gap-2">
+                      <p className="line-clamp-2 text-[14px] leading-snug">{item.headline}</p>
+                      <ExplainButton
+                        onClick={() => onExplain({
+                          type: 'news', title: item.headline,
+                          context: `Nguồn: ${item.source}. Tác động: ${item.marketImpact}. Mã: ${item.affectedTickers.join(', ')}`,
+                          snapshot: { headline: item.headline, source: item.source, impact: item.marketImpact, tickers: item.affectedTickers.join(', ') },
+                        })}
+                        size="sm"
+                      />
+                    </div>
+                    <p className="mt-0.5 text-[12px] text-[var(--fs-muted)]">
+                      {[item.category, item.marketImpact].filter(Boolean).join(', ')}
+                    </p>
+                  </td>
+                  <td className="hidden px-2 py-3 sm:table-cell">
+                    <div className="flex flex-wrap gap-1">
+                      {item.affectedTickers.slice(0, 3).map((t) => <SymbolChip key={t} symbol={t} />)}
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums">
+                    <Reaction r={item.reactions?.[0]} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="border-t border-[var(--fs-line)] px-5 py-3 text-[12px] text-[var(--fs-muted)]">
+            Biến động so với VN-Index, không khẳng định nhân quả.
+          </p>
+        </>
+      )}
+    </Panel>
   )
 }
