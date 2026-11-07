@@ -32,7 +32,7 @@ export function CommentaryPanel({ commentary, loading, onExplain }: CommentaryPa
             </span>
           )}
         </div>
-        <ExplainButton onClick={handleExplain} size="md" label="Phân tích AI" />
+        <ExplainButton onClick={handleExplain} size="md" label="Giải thích" />
       </div>
 
       <div className="p-4 space-y-4">

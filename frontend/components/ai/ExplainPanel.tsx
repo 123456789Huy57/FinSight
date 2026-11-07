@@ -10,7 +10,7 @@ function buildFallback(req: AIExplainRequest | null): AIExplainResponse | null {
   const t = req.symbol ?? req.title
   if (req.type === 'stock') {
     return {
-      summary: `Đang phân tích ${t}. FinSight AI sẽ tổng hợp dữ liệu kỹ thuật (MA, RSI, xu hướng giá) và cơ bản (ngành, vĩ mô, tin tức).`,
+      summary: `Đang phân tích ${t}. FinSight sẽ tổng hợp dữ liệu kỹ thuật (MA, RSI, xu hướng giá) và cơ bản (ngành, vĩ mô, tin tức).`,
       key_drivers: ['Giá và khối lượng giao dịch', 'Xu hướng kỹ thuật ngắn hạn', 'Bối cảnh ngành và tin tức'],
       bullish_factors: ['Dòng tiền đang chú ý mã này', 'Xu hướng có thể đang cải thiện', 'Ngành hỗ trợ'],
       risk_factors: ['Rung lắc theo thị trường chung', 'Khối lượng chưa xác nhận', 'Tin xấu đột ngột'],
@@ -18,7 +18,7 @@ function buildFallback(req: AIExplainRequest | null): AIExplainResponse | null {
     }
   }
   return {
-    summary: `Phân tích ${req.title} sẽ rõ hơn khi FinSight AI thu thập đủ dữ liệu ngữ cảnh.`,
+    summary: `Phân tích ${req.title} sẽ rõ hơn khi FinSight thu thập đủ dữ liệu ngữ cảnh.`,
     key_drivers: ['Dòng tiền và độ rộng', 'Ngành liên quan', 'Tín hiệu tin tức'],
     bullish_factors: ['Hỗ trợ từ nhóm dẫn dắt', 'Bối cảnh tích cực', 'Xác suất lan tỏa'],
     risk_factors: ['Có thể đảo nhịp', 'Dữ liệu chưa đủ', 'Tin tức bất ngờ'],
@@ -88,7 +88,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
               <Sparkles className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h2 className="text-[13px] font-bold text-foreground">FinSight AI</h2>
+              <h2 className="text-[13px] font-bold text-foreground">FinSight</h2>
               <p className="text-[11px] text-[#7a8ba8] font-medium mt-0.5 truncate max-w-[280px]">
                 {request?.title ?? 'Phân tích'}
               </p>

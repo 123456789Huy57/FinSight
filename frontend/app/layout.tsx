@@ -4,8 +4,8 @@ import { TopNav } from '@/components/layout/TopNav'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'FinSight AI — Vietnam Market Intelligence',
-  description: 'Nền tảng phân tích thị trường chứng khoán Việt Nam với AI. Theo dõi VNINDEX, VN30, HNX30 và hàng trăm cổ phiếu theo thời gian thực.',
+  title: 'FinSight',
+  description: 'Đọc tin tài chính Việt Nam cạnh phản ứng giá cổ phiếu.',
   icons: {
     icon: [
       { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },

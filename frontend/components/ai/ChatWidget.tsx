@@ -16,7 +16,7 @@ interface ChatWidgetProps {
 export function ChatWidget({ contextData }: ChatWidgetProps) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', text: 'Xin chào! Tôi là FinSight AI. Hỏi tôi về bất kỳ cổ phiếu, chỉ số, ngành hoặc tin tức nào.' },
+    { role: 'ai', text: 'Hỏi về một mã, ngành hoặc bản tin.' },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -68,14 +68,14 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
               <div className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
               </div>
-              <span className="text-[13px] font-bold text-foreground">FinSight AI</span>
+              <span className="text-[13px] font-bold text-foreground">FinSight</span>
               <span className="live-dot w-1.5 h-1.5 rounded-full bg-[#34d399] ml-0.5" />
             </div>
             <div className="flex items-center gap-1">
             {messages.length > 1 && (
               <button
                 type="button"
-                onClick={() => setMessages([{ role: 'ai', text: 'Xin chào! Tôi là FinSight AI. Hỏi tôi về bất kỳ cổ phiếu, chỉ số, ngành hoặc tin tức nào.' }])}
+                onClick={() => setMessages([{ role: 'ai', text: 'Hỏi về một mã, ngành hoặc bản tin.' }])}
                 title="Xóa cuộc hội thoại"
                 className="w-7 h-7 flex items-center justify-center rounded-lg text-[#3d4f6b] hover:bg-[#1a2744] hover:text-[#f87171] transition-colors"
               >

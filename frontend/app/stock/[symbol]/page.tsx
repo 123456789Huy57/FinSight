@@ -352,7 +352,7 @@ export default function StockPage({ params }: Props) {
                   <Star className={`w-3.5 h-3.5 ${inWatchlist ? 'fill-[#f59e0b]' : ''}`} />
                   {inWatchlist ? 'Đang theo dõi' : 'Theo dõi'}
                 </button>
-                <ExplainButton onClick={explainStock} size="md" label="Phân tích AI" />
+                <ExplainButton onClick={explainStock} size="md" label="Giải thích" />
               </div>
               {quote && (
                 <div className="text-right">
@@ -498,7 +498,7 @@ export default function StockPage({ params }: Props) {
 
             {/* AI CTA */}
             <div className="pt-3 border-t border-[#1a2744]">
-              <ExplainButton onClick={explainStock} size="md" label="Phân tích AI đầy đủ" className="w-full justify-center" />
+              <ExplainButton onClick={explainStock} size="md" label="Xem giải thích đầy đủ" className="w-full justify-center" />
             </div>
           </div>
         </div>
