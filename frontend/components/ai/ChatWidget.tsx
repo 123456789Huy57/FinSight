@@ -54,8 +54,8 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
         <button
           type="button"
           onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 150) }}
-          className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-primary shadow-lg shadow-primary/30
-            flex items-center justify-center text-white hover:bg-primary-hover hover:shadow-primary/40
+          className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-primary
+            flex items-center justify-center text-white hover:bg-primary-hover
             transition-all duration-200 border border-primary/40 hover:scale-105"
         >
           <MessageCircle className="w-5 h-5" />
@@ -64,16 +64,16 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
 
       {/* Chat window */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-[360px] h-[500px] flex flex-col rounded-2xl border border-[#1a2744] bg-[#0e1726] shadow-2xl shadow-black/60 overflow-hidden slide-in-right">
+        <div className="fixed bottom-6 right-6 z-50 w-[360px] h-[500px] flex flex-col rounded-2xl border border-[var(--fs-line)] bg-[var(--fs-paper)] overflow-hidden slide-in-right">
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(79,142,247,0.12)] bg-[#0e1726] flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--fs-signal)]/[0.12] bg-[var(--fs-paper)] flex-shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
               </div>
               <span className="text-[13px] font-bold text-foreground">FinSight</span>
-              <span className="live-dot w-1.5 h-1.5 rounded-full bg-[#34d399] ml-0.5" />
+              <span className="live-dot w-1.5 h-1.5 rounded-full bg-[var(--fs-up)] ml-0.5" />
             </div>
             <div className="flex items-center gap-1">
             {messages.length > 1 && (
@@ -81,14 +81,14 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
                 type="button"
                 onClick={() => setMessages([{ role: 'ai', text: 'Hỏi về một mã, ngành hoặc bản tin.' }])}
                 title="Xóa cuộc hội thoại"
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[#3d4f6b] hover:bg-[#1a2744] hover:text-[#f87171] transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--fs-muted)] hover:bg-[var(--fs-surface)] hover:text-[var(--fs-down)] transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
             <button
               onClick={() => setOpen(false)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-[#7a8ba8] hover:bg-[#1a2744] hover:text-foreground transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--fs-muted)] hover:bg-[var(--fs-surface)] hover:text-foreground transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -108,7 +108,7 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
                       'max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed select-text',
                       isUser
                         ? 'bg-primary text-white rounded-br-sm'
-                        : 'bg-[#071433] text-foreground rounded-bl-sm border border-[#12304a] cursor-pointer',
+                        : 'bg-[var(--fs-surface)] text-foreground rounded-bl-sm border border-[var(--fs-line)] cursor-pointer',
                     ].join(' ')}
                     style={
                       !isUser && !isExpanded
@@ -124,7 +124,7 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
             })}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-[#0e1726] border border-[#1a2744] rounded-xl rounded-bl-sm px-3 py-2">
+                <div className="bg-[var(--fs-paper)] border border-[var(--fs-line)] rounded-xl rounded-bl-sm px-3 py-2">
                   <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
                 </div>
               </div>
@@ -144,7 +144,7 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
                   key={q}
                   type="button"
                   onClick={() => void send(q)}
-                  className="text-[11px] bg-[#0e1726] hover:bg-[#1a2744] border border-[#1a2744] rounded-full px-2.5 py-1 text-[#7a8ba8] hover:text-foreground transition-colors"
+                  className="text-[11px] bg-[var(--fs-paper)] hover:bg-[var(--fs-surface)] border border-[var(--fs-line)] rounded-full px-2.5 py-1 text-[var(--fs-muted)] hover:text-foreground transition-colors"
                 >
                   {q}
                 </button>
@@ -153,7 +153,7 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
           )}
 
           {/* Input */}
-          <div className="px-3 py-3 border-t border-[#1a2744] flex gap-2 flex-shrink-0">
+          <div className="px-3 py-3 border-t border-[var(--fs-line)] flex gap-2 flex-shrink-0">
             <input
               ref={inputRef}
               type="text"
@@ -161,8 +161,8 @@ export function ChatWidget({ contextData }: ChatWidgetProps) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send() } }}
               placeholder="Hỏi về thị trường..."
-              className="flex-1 bg-[#0e1726] border border-[#1a2744] rounded-lg px-3 py-2 text-xs text-foreground
-                placeholder:text-[#3d4f6b] focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30 transition-colors"
+              className="flex-1 bg-[var(--fs-paper)] border border-[var(--fs-line)] rounded-lg px-3 py-2 text-xs text-foreground
+                placeholder:text-[var(--fs-muted)] focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30 transition-colors"
             />
             <button
               type="button"

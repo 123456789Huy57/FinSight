@@ -80,25 +80,25 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed right-0 top-0 z-50 h-full w-full md:w-[480px] flex flex-col border-l border-[#1a2744] bg-[#0e1726] shadow-2xl shadow-black/60 slide-in-right">
+      <div className="fixed inset-0 z-40 bg-black/70" onClick={onClose} />
+      <div className="fixed right-0 top-0 z-50 h-full w-full md:w-[480px] flex flex-col border-l border-[var(--fs-line)] bg-[var(--fs-paper)] slide-in-right">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(79,142,247,0.12)] bg-[#0e1726] flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--fs-signal)]/[0.12] bg-[var(--fs-paper)] flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-primary" />
             </div>
             <div>
               <h2 className="text-[13px] font-bold text-foreground">FinSight</h2>
-              <p className="text-[11px] text-[#7a8ba8] font-medium mt-0.5 truncate max-w-[280px]">
+              <p className="text-[11px] text-[var(--fs-muted)] font-medium mt-0.5 truncate max-w-[280px]">
                 {request?.title ?? 'Phân tích'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7a8ba8] hover:bg-[#1a2744] hover:text-foreground transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--fs-muted)] hover:bg-[var(--fs-surface)] hover:text-foreground transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -112,14 +112,14 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
             <div className="flex flex-col items-center justify-center py-16 space-y-3">
               <Loader2 className="w-8 h-8 text-primary animate-spin" />
               <p className="text-sm font-bold text-primary">Đang phân tích...</p>
-              <p className="text-xs text-[#7a8ba8]">Tổng hợp dữ liệu kỹ thuật và cơ bản</p>
+              <p className="text-xs text-[var(--fs-muted)]">Tổng hợp dữ liệu kỹ thuật và cơ bản</p>
             </div>
           )}
 
           {/* Preview while loading */}
           {loading && fallback && (
-            <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] p-4 opacity-40">
-              <p className="text-xs text-[#7a8ba8] italic">{fallback.summary}</p>
+            <div className="rounded-2xl border border-[var(--fs-signal)]/[0.15] bg-[var(--fs-paper)] p-4 opacity-40">
+              <p className="text-xs text-[var(--fs-muted)] italic">{fallback.summary}</p>
             </div>
           )}
 
@@ -137,15 +137,15 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
 
               {/* Live snapshot */}
               {request?.snapshot && (
-                <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] p-4">
+                <div className="rounded-2xl border border-[var(--fs-signal)]/[0.15] bg-[var(--fs-paper)] p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Cpu className="w-3.5 h-3.5 text-[#06b6d4]" />
-                    <span className="text-[10px] font-bold text-[#06b6d4] uppercase tracking-wider">Dữ liệu thực tế</span>
+                    <Cpu className="w-3.5 h-3.5 text-[var(--fs-signal)]" />
+                    <span className="text-[10px] font-bold text-[var(--fs-signal)] uppercase tracking-wider">Dữ liệu thực tế</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(request.snapshot).map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-2 text-xs border-b border-[#0f1f3d] pb-1.5">
-                        <span className="text-[#7a8ba8]">{SNAPSHOT_LABELS[k] ?? k.replace(/_/g, ' ')}</span>
+                      <div key={k} className="flex justify-between gap-2 text-xs border-b border-[var(--fs-line)] pb-1.5">
+                        <span className="text-[var(--fs-muted)]">{SNAPSHOT_LABELS[k] ?? k.replace(/_/g, ' ')}</span>
                         <span className="font-semibold text-foreground">{fmt(v)}</span>
                       </div>
                     ))}
@@ -155,10 +155,10 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
 
               {/* Technical snapshot from AI */}
               {active.technical_snapshot && (
-                <div className="rounded-xl border border-[#06b6d4]/20 bg-[#06b6d4]/[0.04] p-4">
+                <div className="rounded-xl border border-[var(--fs-signal)]/20 bg-[var(--fs-signal)]/[0.04] p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Cpu className="w-3.5 h-3.5 text-[#06b6d4]" />
-                    <span className="text-[10px] font-bold text-[#06b6d4] uppercase tracking-wider">Kỹ thuật</span>
+                    <Cpu className="w-3.5 h-3.5 text-[var(--fs-signal)]" />
+                    <span className="text-[10px] font-bold text-[var(--fs-signal)] uppercase tracking-wider">Kỹ thuật</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     {[
@@ -169,8 +169,8 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
                       ['5D%', active.technical_snapshot.ret_5d_pct ? `${active.technical_snapshot.ret_5d_pct > 0 ? '+' : ''}${active.technical_snapshot.ret_5d_pct}%` : null],
                       ['20D%', active.technical_snapshot.ret_20d_pct ? `${active.technical_snapshot.ret_20d_pct > 0 ? '+' : ''}${active.technical_snapshot.ret_20d_pct}%` : null],
                     ].map(([label, val]) => val !== null && val !== undefined ? (
-                      <div key={label as string} className="flex justify-between border-b border-[#0f1f3d] pb-1">
-                        <span className="text-[#7a8ba8]">{label as string}</span>
+                      <div key={label as string} className="flex justify-between border-b border-[var(--fs-line)] pb-1">
+                        <span className="text-[var(--fs-muted)]">{label as string}</span>
                         <span className="font-semibold text-foreground">{fmt(val)}</span>
                       </div>
                     ) : null)}
@@ -180,12 +180,12 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
 
               {/* Fundamental snapshot */}
               {active.fundamental_snapshot && (
-                <div className="rounded-xl border border-[#34d399]/20 bg-[#34d399]/[0.04] p-4">
+                <div className="rounded-xl border border-[var(--fs-up)]/20 bg-[var(--fs-up)]/[0.04] p-4">
                   <div className="flex items-center gap-2 mb-2.5">
-                    <TrendingUp className="w-3.5 h-3.5 text-[#34d399]" />
-                    <span className="text-[10px] font-bold text-[#34d399] uppercase tracking-wider">Cơ bản</span>
+                    <TrendingUp className="w-3.5 h-3.5 text-[var(--fs-up)]" />
+                    <span className="text-[10px] font-bold text-[var(--fs-up)] uppercase tracking-wider">Cơ bản</span>
                   </div>
-                  <p className="text-xs text-[#7a8ba8] mb-1">
+                  <p className="text-xs text-[var(--fs-muted)] mb-1">
                     <span className="font-semibold text-foreground">Ngành: </span>
                     {active.fundamental_snapshot.sector ?? 'N/A'}
                   </p>
@@ -197,15 +197,15 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
 
               {/* Key drivers */}
               {active.key_drivers?.length ? (
-                <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] p-4">
+                <div className="rounded-2xl border border-[var(--fs-signal)]/[0.15] bg-[var(--fs-paper)] p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Zap className="w-3.5 h-3.5 text-[#06b6d4]" />
-                    <span className="text-[10px] font-bold text-[#06b6d4] uppercase tracking-wider">Động lực chính</span>
+                    <Zap className="w-3.5 h-3.5 text-[var(--fs-signal)]" />
+                    <span className="text-[10px] font-bold text-[var(--fs-signal)] uppercase tracking-wider">Động lực chính</span>
                   </div>
                   <ul className="space-y-2">
                     {active.key_drivers.map((item, i) => (
                       <li key={i} className="flex gap-2.5 text-xs text-foreground leading-relaxed">
-                        <span className="text-[#06b6d4] font-black mt-0.5 flex-shrink-0">→</span>
+                        <span className="text-[var(--fs-signal)] font-black mt-0.5 flex-shrink-0">→</span>
                         {item}
                       </li>
                     ))}
@@ -215,15 +215,15 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
 
               {/* Bullish */}
               {active.bullish_factors?.length ? (
-                <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] p-4">
+                <div className="rounded-2xl border border-[var(--fs-signal)]/[0.15] bg-[var(--fs-paper)] p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="w-3.5 h-3.5 text-[#34d399]" />
-                    <span className="text-[10px] font-bold text-[#34d399] uppercase tracking-wider">Điểm tích cực</span>
+                    <TrendingUp className="w-3.5 h-3.5 text-[var(--fs-up)]" />
+                    <span className="text-[10px] font-bold text-[var(--fs-up)] uppercase tracking-wider">Điểm tích cực</span>
                   </div>
                   <ul className="space-y-2">
                     {active.bullish_factors.map((item, i) => (
                       <li key={i} className="flex gap-2.5 text-xs text-foreground leading-relaxed">
-                        <span className="text-[#34d399] font-black mt-0.5 flex-shrink-0">+</span>
+                        <span className="text-[var(--fs-up)] font-black mt-0.5 flex-shrink-0">+</span>
                         {item}
                       </li>
                     ))}
@@ -233,15 +233,15 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
 
               {/* Risk */}
               {active.risk_factors?.length ? (
-                <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] p-4">
+                <div className="rounded-2xl border border-[var(--fs-signal)]/[0.15] bg-[var(--fs-paper)] p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <ShieldAlert className="w-3.5 h-3.5 text-[#f87171]" />
-                    <span className="text-[10px] font-bold text-[#f87171] uppercase tracking-wider">Rủi ro</span>
+                    <ShieldAlert className="w-3.5 h-3.5 text-[var(--fs-down)]" />
+                    <span className="text-[10px] font-bold text-[var(--fs-down)] uppercase tracking-wider">Rủi ro</span>
                   </div>
                   <ul className="space-y-2">
                     {active.risk_factors.map((item, i) => (
                       <li key={i} className="flex gap-2.5 text-xs text-foreground leading-relaxed">
-                        <span className="text-[#f87171] font-black mt-0.5 flex-shrink-0">-</span>
+                        <span className="text-[var(--fs-down)] font-black mt-0.5 flex-shrink-0">-</span>
                         {item}
                       </li>
                     ))}
@@ -251,15 +251,15 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
 
               {/* Watch next */}
               {active.watch_next?.length ? (
-                <div className="rounded-2xl border border-[rgba(79,142,247,0.15)] bg-[#0e1726] p-4">
+                <div className="rounded-2xl border border-[var(--fs-signal)]/[0.15] bg-[var(--fs-paper)] p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Eye className="w-3.5 h-3.5 text-[#f59e0b]" />
-                    <span className="text-[10px] font-bold text-[#f59e0b] uppercase tracking-wider">Cần theo dõi</span>
+                    <Eye className="w-3.5 h-3.5 text-[var(--fs-ink-2)]" />
+                    <span className="text-[10px] font-bold text-[var(--fs-ink-2)] uppercase tracking-wider">Cần theo dõi</span>
                   </div>
                   <ul className="space-y-2">
                     {active.watch_next.map((item, i) => (
                       <li key={i} className="flex gap-2.5 text-xs text-foreground leading-relaxed">
-                        <span className="text-[#f59e0b] font-black mt-0.5 flex-shrink-0">◎</span>
+                        <span className="text-[var(--fs-ink-2)] font-black mt-0.5 flex-shrink-0">◎</span>
                         {item}
                       </li>
                     ))}
@@ -271,8 +271,8 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-[#1a2744] flex-shrink-0">
-          <p className="text-[10px] text-[#3d4f6b] leading-relaxed">
+        <div className="px-5 py-3 border-t border-[var(--fs-line)] flex-shrink-0">
+          <p className="text-[10px] text-[var(--fs-muted)] leading-relaxed">
             Giải thích được tạo tự động từ dữ liệu kỹ thuật và cơ bản. Không phải khuyến nghị đầu tư.
           </p>
         </div>
