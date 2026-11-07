@@ -19,8 +19,8 @@ interface Props {
 export function MarketStatusBadge({ status, className = '' }: Props) {
   if (!status) {
     return (
-      <span className={`inline-flex items-center gap-1.5 text-[11px] text-[#3d4f6b] ${className}`}>
-        <span className="w-1.5 h-1.5 rounded-full bg-[#1e3158]" />
+      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-[var(--fs-muted)] ${className}`}>
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--fs-muted)]" />
         Đang kiểm tra
       </span>
     )
@@ -31,22 +31,11 @@ export function MarketStatusBadge({ status, className = '' }: Props) {
 
   return (
     <span
-      className={[
-        'inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border whitespace-nowrap',
-        open
-          ? 'text-[#34d399] border-[#34d399]/25 bg-[#34d399]/8'
-          : 'text-[#7a8ba8] border-[#1a2744] bg-[#0e1726]',
-        className,
-      ].join(' ')}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-[var(--fs-muted)] ${className}`}
       title={`Giờ máy chủ: ${new Date(status.server_time).toLocaleTimeString('vi-VN')}`}
     >
-      <span
-        className={[
-          'w-1.5 h-1.5 rounded-full',
-          open ? 'bg-[#34d399] live-dot' : 'bg-[#3d4f6b]',
-        ].join(' ')}
-      />
-      {open ? `LIVE · ${label}` : label}
+      <span className={`h-1.5 w-1.5 rounded-full ${open ? 'bg-[var(--fs-up)]' : 'bg-[var(--fs-muted)]'}`} />
+      {label}
     </span>
   )
 }
