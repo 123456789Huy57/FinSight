@@ -1,9 +1,8 @@
 'use client'
 
-import { ExternalLink } from 'lucide-react'
-import Link from 'next/link'
-import type { EventWindow, NewsItem, AIExplainRequest } from '@/lib/api'
+import type { EventWindow, NewsItem, NewsReaction, AIExplainRequest } from '@/lib/api'
 import { ExplainButton } from '@/components/shared/ExplainButton'
+import { Change, SymbolChip } from '@/components/fs'
 
 export type ImpactClass = 'positive' | 'negative' | 'watch' | 'neutral'
 
@@ -18,33 +17,6 @@ export function classifyImpact(impact: string): ImpactClass {
   return 'neutral'
 }
 
-const IMPACT_STYLE: Record<ImpactClass, string> = {
-  positive: 'bg-primary/10 text-primary border-primary/25',
-  negative: 'bg-[#fbbf24]/10 text-[#fbbf24] border-[#fbbf24]/25',
-  watch:    'bg-[#f59e0b]/8 text-[#f59e0b] border-[#f59e0b]/25',
-  neutral:  'bg-[#1a2744] text-[#7a8ba8] border-[#1e3158]',
-}
-
-function ImpactBadge({ impact }: { impact: string }) {
-  const cls = classifyImpact(impact)
-  return (
-    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${IMPACT_STYLE[cls]}`}>
-      {impact}
-    </span>
-  )
-}
-
-function formatWindow(window: EventWindow, eligibleForMeasurement: boolean): string {
-  if (window.status === 'measured' && eligibleForMeasurement && window.abnormalReturnPct != null) {
-    const value = window.abnormalReturnPct
-    return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
-  }
-  if (window.status === 'overlapping_event') return 'Trùng cửa sổ tin'
-  if (window.status === 'insufficient_data') return 'Thiếu dữ liệu'
-  if (window.status === 'pending') return 'Chờ đủ phiên'
-  return 'Chưa đo được'
-}
-
 export function formatNewsTime(time: string): string {
   if (!time || time === 'Now') return 'Vừa xong'
   try {
@@ -54,101 +26,128 @@ export function formatNewsTime(time: string): string {
     if (diffMin < 1) return 'Vừa xong'
     if (diffMin < 60) return `${diffMin} phút trước`
     const diffH = Math.floor(diffMin / 60)
-    if (diffH < 24) return `${diffH}h trước`
+    if (diffH < 24) return `${diffH} giờ trước`
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
   } catch {
     return time
   }
 }
 
+const SENTIMENT_WORD: Record<ImpactClass, string> = {
+  positive: 'tích cực',
+  negative: 'tiêu cực',
+  watch: 'cần theo dõi',
+  neutral: 'trung lập',
+}
+
+export function sentimentLine(item: NewsItem): string {
+  if (item.sentimentScore == null || Number.isNaN(item.sentimentScore)) {
+    return `Sắc thái ${SENTIMENT_WORD[classifyImpact(item.marketImpact)]}`
+  }
+  const s = item.sentimentScore
+  const word = s > 0.05 ? 'tích cực' : s < -0.05 ? 'tiêu cực' : 'trung lập'
+  const body = Math.abs(s).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const sign = s > 0.005 ? '+' : s < -0.005 ? '−' : ''
+  return `Sắc thái ${word}, điểm ${sign}${body}`
+}
+
+function WindowValue({ window }: { window: EventWindow }) {
+  if (window.status === 'measured' && window.abnormalReturnPct != null) {
+    return <Change value={window.abnormalReturnPct} className="text-[14px] font-medium" />
+  }
+  const text =
+    window.status === 'pending' ? 'Chờ phiên sau'
+    : window.status === 'overlapping_event' ? 'Trùng tin khác'
+    : 'Chưa đủ dữ liệu'
+  return <span className="text-[13px] text-[var(--fs-muted)]" title={window.reason ?? undefined}>{text}</span>
+}
+
+export function ReactionColumns({ reaction, extra = 0 }: { reaction?: NewsReaction; extra?: number }) {
+  if (!reaction) return null
+  return (
+    <div className="flex gap-6 sm:gap-5">
+      <div className="min-w-[88px]">
+        <p className="text-[12px] text-[var(--fs-muted)]">Phiên sau</p>
+        <WindowValue window={reaction.t1} />
+      </div>
+      <div className="min-w-[88px]">
+        <p className="text-[12px] text-[var(--fs-muted)]">5 phiên</p>
+        <WindowValue window={reaction.t5} />
+        {extra > 0 && <p className="text-[12px] text-[var(--fs-muted)]">+{extra} mã</p>}
+      </div>
+    </div>
+  )
+}
+
 interface Props {
   item: NewsItem
   onExplain: (req: AIExplainRequest) => void
+  /** Mã ưu tiên khi chọn reaction (trang chi tiết mã). */
+  focusSymbol?: string
 }
 
-export function NewsCard({ item, onExplain }: Props) {
+export function NewsCard({ item, onExplain, focusSymbol }: Props) {
+  const reactions = item.reactions ?? []
+  const reaction = (focusSymbol && reactions.find((r) => r.symbol === focusSymbol)) || reactions[0]
+  const extra = focusSymbol ? 0 : Math.max(0, reactions.length - 1)
+
   return (
-    <div className="group px-5 py-4 hover:bg-[#0e1726] transition-colors border-b border-[#0f1f3d] last:border-0">
-      {/* Top row */}
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-          <span className="text-[11px] font-bold text-[#7a8ba8]">{item.source}</span>
-          <span className="text-[#1e3158] text-[11px]">·</span>
-          <span className="text-[11px] text-[#3d4f6b]">{formatNewsTime(item.time)}</span>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <ImpactBadge impact={item.marketImpact} />
-          {item.url && (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Mở bài viết từ ${item.source} (mở tab mới)`}
-              onClick={(e) => e.stopPropagation()}
-              className="text-[#3d4f6b] hover:text-primary transition-colors"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* Headline */}
-      <h3 className="text-sm font-bold text-foreground leading-snug mb-2 group-hover:text-primary transition-colors line-clamp-2">
-        {item.headline}
-      </h3>
-
-      {/* Insight */}
-      {item.insight && (
-        <p className="text-xs text-[#7a8ba8] leading-relaxed mb-3 line-clamp-2">
-          {item.insight}
+    <div className="flex flex-col gap-3 border-b border-[var(--fs-line)] px-5 py-4 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] text-[var(--fs-muted)]">
+          {formatNewsTime(item.time)}, {item.source}
         </p>
-      )}
 
-      {(item.reactions?.length ?? 0) > 0 && (
-        <div className="mb-3 rounded-lg border border-[#1a2744] bg-[#070d1a]/60 px-3 py-2">
-          <p className="mb-1.5 text-[10px] font-semibold text-[#7a8ba8]">Phản ứng quan sát so với VN-Index · T+1 / T+5</p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            {item.reactions?.map((reaction) => (
-              <span key={reaction.symbol} className="text-[10px] text-[#7a8ba8]">
-                <Link href={`/stock/${reaction.symbol}`} className="font-bold text-primary hover:underline">{reaction.symbol}</Link>
-                {' · '}{formatWindow(reaction.t1, reaction.dataMode === 'market-provider' && Boolean(reaction.methodVersion))}
-                {' / '}{formatWindow(reaction.t5, reaction.dataMode === 'market-provider' && Boolean(reaction.methodVersion))}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+        {item.url ? (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 block rounded text-[15px] font-medium leading-snug text-[var(--fs-ink)] hover:text-[var(--fs-signal)] hover:underline sm:text-[16px]"
+          >
+            {item.headline}
+            <span className="sr-only"> (mở bài viết từ {item.source} ở tab mới)</span>
+          </a>
+        ) : (
+          <h3 className="mt-1 text-[15px] font-medium leading-snug text-[var(--fs-ink)] sm:text-[16px]">{item.headline}</h3>
+        )}
 
-      {/* Tickers + AI */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1">
+        {item.insight && (
+          <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-[var(--fs-ink-2)]">{item.insight}</p>
+        )}
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {item.affectedTickers.slice(0, 4).map((t) => (
-            <Link
-              key={t}
-              href={`/stock/${t}`}
-              className="text-[10px] font-bold text-primary bg-primary/8 border border-primary/20 rounded px-1.5 py-0.5 hover:bg-primary/15 transition-colors"
-            >
-              {t}
-            </Link>
+            <SymbolChip key={t} symbol={t} />
           ))}
+          <ExplainButton
+            onClick={() => onExplain({
+              type: 'news',
+              title: item.headline,
+              context: `Nguồn: ${item.source}. Tác động: ${item.marketImpact}. Mã liên quan: ${item.affectedTickers.join(', ')}. Tóm tắt: ${item.insight ?? ''}`,
+              snapshot: {
+                headline: item.headline,
+                source: item.source,
+                impact: item.marketImpact,
+                tickers: item.affectedTickers.join(', '),
+                insight: item.insight ?? '',
+              },
+            })}
+            size="sm"
+          />
         </div>
-        <ExplainButton
-          onClick={() => onExplain({
-            type: 'news',
-            title: item.headline,
-            context: `Nguồn: ${item.source}. Tác động: ${item.marketImpact}. Mã liên quan: ${item.affectedTickers.join(', ')}. Tóm tắt: ${item.insight ?? ''}`,
-            snapshot: {
-              headline: item.headline,
-              source: item.source,
-              impact: item.marketImpact,
-              tickers: item.affectedTickers.join(', '),
-              insight: item.insight ?? '',
-            },
-          })}
-          size="sm"
-        />
+
+        <p className="mt-2 text-[13px] text-[var(--fs-muted)]">{sentimentLine(item)}</p>
       </div>
+
+      {reaction && (
+        <div className="shrink-0 sm:pt-5">
+          {reactions.length > 1 && (
+            <p className="mb-1 text-[12px] text-[var(--fs-muted)]">{reaction.symbol}</p>
+          )}
+          <ReactionColumns reaction={reaction} extra={extra} />
+        </div>
+      )}
     </div>
   )
 }
