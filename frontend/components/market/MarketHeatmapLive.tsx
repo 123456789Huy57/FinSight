@@ -65,6 +65,7 @@ export function MarketHeatmapLive({ height = 520 }: { height?: number }) {
   return (
     <MarketHeatmap
       data={items}
+      exchange={`${items.length} mã`}
       height={height}
       note={
         <span title={res.source ? `Nguồn: ${res.source}` : undefined}>
