@@ -36,7 +36,9 @@ export function useMarketPolling(
 ): MarketStatus | null {
   const [status, setStatus] = useState<MarketStatus | null>(null)
   const savedCallback = useRef(callback)
-  savedCallback.current = callback
+  useEffect(() => {
+    savedCallback.current = callback
+  }, [callback])
 
   const refreshStatus = useCallback(async () => {
     try {
