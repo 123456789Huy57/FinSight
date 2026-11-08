@@ -1,5 +1,10 @@
 # Backend task log
 
+## BE-DEPLOY-DEBUG — sửa lỗi gọi daily sync trong GitHub Actions
+- Lần chạy workflow #5 đã qua bước `Apply migrations`; lỗi còn lại là `ModuleNotFoundError: No module named 'core'` do chạy file `scripts/daily_sync.py` trực tiếp khiến Python chỉ đặt thư mục `scripts` vào import path.
+- Sửa workflow đặt `PYTHONPATH` về thư mục `backend` và gọi script như module `python -m scripts.daily_sync`; không thay đổi logic đồng bộ hoặc secret.
+- Đã xác minh nguyên nhân từ log job `128790209944` của run `42499913251`; cần chạy lại workflow sau khi push.
+
 ## BE-00 — hướng dẫn làm backend
 - Tạo `AGENTS.md` ở gốc repo và nhật ký này.
 - Kiểm tra: hai file có mặt; chưa cần chạy test cho thay đổi tài liệu.
