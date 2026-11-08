@@ -1,6 +1,6 @@
 from datetime import date
 
-from jobs.sync_universe import choose_due_symbols, quota_has_headroom
+from jobs.sync_universe import checkpointable_symbols, choose_due_symbols, quota_has_headroom
 
 
 def test_universe_sync_resumes_missing_and_stale_symbols_without_retrying_same_target():
@@ -29,3 +29,10 @@ def test_quota_guard_reserves_capacity_for_other_vnstock_use():
     usage["used"]["day"] = 8000
     assert not quota_has_headroom(usage)
     assert not quota_has_headroom({"limits": {}, "used": {}})
+
+
+def test_partial_provider_failures_checkpoint_only_successful_symbols():
+    symbols = ["AAA", "BBB", "CCC"]
+    completed = checkpointable_symbols(symbols, ["BBB"])
+    assert completed == ["AAA", "CCC"]
+    assert len(symbols) - len(completed) == 1  # failed symbols remain in remaining count

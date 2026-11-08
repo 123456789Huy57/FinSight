@@ -98,7 +98,7 @@ async def ingest_price_history(
     symbols: list[str] | None = None,
     request_delay_seconds: float | None = None,
     include_indices: bool = True,
-) -> dict[str, int | str]:
+) -> dict[str, Any]:
     provider = get_market_provider()
     if request_delay_seconds is None:
         request_delay_seconds = (settings.vnstock_request_delay_seconds
@@ -126,7 +126,7 @@ async def ingest_price_history(
 async def _finish_provider_run(
     run_id: str,
     status: str,
-    summary: dict[str, int | str] | None,
+    summary: dict[str, Any] | None,
     error: str | None,
 ) -> None:
     async with AsyncSessionLocal.begin() as session:
@@ -146,7 +146,7 @@ async def _ingest_price_history(
     symbols: list[str] | None,
     request_delay_seconds: float,
     include_indices: bool,
-) -> dict[str, int | str]:
+) -> dict[str, Any]:
     effective_rpm = float(settings.provider_rpm)
     if request_delay_seconds > 0:
         effective_rpm = min(effective_rpm, 60.0 / request_delay_seconds)
@@ -192,9 +192,10 @@ async def _ingest_price_history(
             },
         ))
 
-    result: dict[str, int | str] = {"symbols": len(symbol_records), "bars": 0, "failed_symbols": 0,
-                                    "index_bars": 0, "failed_indices": 0, "empty_symbols": 0,
-                                    "empty_indices": 0}
+    result: dict[str, Any] = {"symbols": len(symbol_records), "bars": 0, "failed_symbols": 0,
+                              "index_bars": 0, "failed_indices": 0, "empty_symbols": 0,
+                              "empty_indices": 0}
+    result["failed_symbol_names"] = []
     result["source"] = provider.source_id
     result["dataMode"] = provider.data_mode
     for symbol_row in symbol_records:
@@ -224,6 +225,7 @@ async def _ingest_price_history(
             if _is_provider_limit_error(exc, provider):
                 raise
             result["failed_symbols"] += 1
+            result["failed_symbol_names"].append(symbol)
             print(f"OHLCV ingestion failed for {symbol}: {exc}", flush=True)
 
     for index_symbol in (("VNINDEX", "HNXINDEX", "UPCOMINDEX") if include_indices else ()):

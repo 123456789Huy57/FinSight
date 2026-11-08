@@ -33,6 +33,12 @@ def quota_has_headroom(usage: dict, reserve_fraction: float = 0.2) -> bool:
     return True
 
 
+def checkpointable_symbols(symbols: list[str], failed_symbols: list[str]) -> list[str]:
+    """Checkpoint completed symbols while leaving failed fetches eligible to retry."""
+    failed = set(failed_symbols)
+    return [symbol for symbol in symbols if symbol not in failed]
+
+
 async def sync_universe_batch(batch_size: int = 50) -> dict[str, int | str | None]:
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
@@ -70,20 +76,24 @@ async def sync_universe_batch(batch_size: int = 50) -> dict[str, int | str | Non
     # advances it later. A failed provider batch is retried, not checkpointed.
     result = await ingest_price_history(start=start, end=date.today(), symbols=symbols,
                                         include_indices=index_as_of is None)
-    async with AsyncSessionLocal.begin() as session:
-        checkpoint_target = (await session.scalar(select(func.max(IndexBar.trade_date)).where(
-            IndexBar.source == source, IndexBar.index_symbol == "VNINDEX"
-        ))) or target
-        statement = insert(UniverseSyncAttempt).values([
-            {"source": source, "symbol": symbol, "target_trade_date": checkpoint_target,
-             "attempted_at": datetime.now(timezone.utc)} for symbol in symbols
-        ])
-        await session.execute(statement.on_conflict_do_update(
-            index_elements=[UniverseSyncAttempt.source, UniverseSyncAttempt.symbol],
-            set_={"target_trade_date": statement.excluded.target_trade_date,
-                  "attempted_at": statement.excluded.attempted_at},
-        ))
-    remaining = len(choose_due_symbols(rows, target, len(rows))) - len(due)
+    completed_symbols = checkpointable_symbols(symbols, result.get("failed_symbol_names", []))
+    checkpoint_target = target
+    if completed_symbols:
+        async with AsyncSessionLocal.begin() as session:
+            checkpoint_target = (await session.scalar(select(func.max(IndexBar.trade_date)).where(
+                IndexBar.source == source, IndexBar.index_symbol == "VNINDEX"
+            ))) or target
+            statement = insert(UniverseSyncAttempt).values([
+                {"source": source, "symbol": symbol, "target_trade_date": checkpoint_target,
+                 "attempted_at": datetime.now(timezone.utc)} for symbol in completed_symbols
+            ])
+            await session.execute(statement.on_conflict_do_update(
+                index_elements=[UniverseSyncAttempt.source, UniverseSyncAttempt.symbol],
+                set_={"target_trade_date": statement.excluded.target_trade_date,
+                      "attempted_at": statement.excluded.attempted_at},
+            ))
+    remaining = len(choose_due_symbols(rows, target, len(rows))) - len(completed_symbols)
     return {"source": source, "target": checkpoint_target.isoformat(), "attempted": len(due),
             "remaining": remaining, "bars": int(result["bars"]),
-            "failed": int(result["failed_symbols"]), "empty": int(result["empty_symbols"])}
+            "failed": int(result["failed_symbols"]), "empty": int(result["empty_symbols"]),
+            "checkpointed": len(completed_symbols)}
