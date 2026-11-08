@@ -1,6 +1,6 @@
 # FinSight – Kế hoạch Backend giai đoạn 4 (giao cho Codex)
 
-> **Cập nhật 07/11/2026:** Chủ dự án chọn Vnstock Community cho chạy thử cục bộ. Luồng 1 DNSE ở dưới tạm dừng; các task BE-10–BE-17 chỉ còn là phương án nếu sau này chọn DNSE và được cấp quyền dữ liệu. Xem `backend/VNSTOCK_SETUP.md` và quyết định mới ở `docs/decisions.md`. Luồng 0 vẫn áp dụng. Bảng hiện trạng mục 2 là mốc trước các thay đổi BE-00/BE-01/BE-VN ghi trong `docs/backend-log.md`.
+> **Cập nhật 08/11/2026:** Chủ dự án chọn Vnstock Community cho chạy thử cục bộ và yêu cầu toàn bộ mã đang giao dịch (HOSE, HNX, UPCOM). Luồng 1 DNSE ở dưới tạm dừng; các task BE-10–BE-17 chỉ còn là phương án nếu sau này chọn DNSE và được cấp quyền dữ liệu. Xem `backend/VNSTOCK_SETUP.md` và quyết định mới ở `docs/decisions.md`. Luồng 0 vẫn áp dụng. Bảng hiện trạng mục 2 là mốc trước các thay đổi BE-00/BE-01/BE-VN ghi trong `docs/backend-log.md`.
 
 *Tài liệu bàn giao cho agent thực thi. Mỗi phiên làm **một task**, chỉ đọc mục 0–4 và đúng task đó. Mỗi task ghi rõ mức model, file cần đọc, lệnh kiểm tra và tiêu chí xong. Review do người khác làm sau mỗi task, nên commit nhỏ, message rõ.*
 

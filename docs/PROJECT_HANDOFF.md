@@ -80,7 +80,7 @@ Hợp đồng chuẩn của provider nằm ở backend/providers/base.py. Các t
 | Provider | Có trong code | Cài mặc định trong Docker | Tình trạng |
 |---|---:|---:|---|
 | CSV demo | Có | Có | Provider mặc định, dữ liệu synthetic gắn source=csv-demo, dataMode=synthetic-demo. |
-| vnstock | Có adapter v5 | Không | Adapter gọi Market/Reference, lấy history từ VCI và có giả định giá cổ phiếu cần nhân 1.000. Cần cài package riêng, key/entitlement có thể cần, kiểm chứng schema/đơn vị/điều khoản trước khi dùng. |
+| vnstock | Có adapter v5 | Tùy `INSTALL_VNSTOCK` | Chạy cục bộ với Community key; `VNSTOCK_SYMBOLS=ALL` nhập HOSE/HNX/UPCOM, VCI trả giá đã điều chỉnh đơn vị nghìn đồng, FinSight lưu bằng đồng. Render vẫn dùng CSV. |
 | DNSE | Chưa có | Không | Chưa thể đặt MARKET_PROVIDER=dnse; factory sẽ từ chối. |
 | SSI FastConnect Data | Chưa có | Không | Chưa thể đặt MARKET_PROVIDER=ssi; factory sẽ từ chối. |
 
@@ -93,12 +93,12 @@ Factory hiện tại ở backend/providers/factory.py chỉ ánh xạ csv → cs
 - Bar có source trong khoá dữ liệu: cùng symbol/ngày có thể giữ dữ liệu của nhiều provider mà không ghi đè chéo.
 - Normalizer chấp nhận một số tên cột khác nhau, bỏ bar thiếu ngày/close hoặc giá không hợp lệ, đổi đơn vị theo stock_price_multiplier, và lưu adjusted_close khi provider trả trường này.
 - Mỗi lần ingest ghi trạng thái vào provider_job_runs; API data status dựa trên dữ liệu và lần chạy gần nhất.
-- CSV demo có 15 mã, dữ liệu lịch sử synthetic. Trong lần kiểm tra API gần nhất, HPG có asOf=2026-10-30.
+- CSV demo có 15 mã synthetic. Vnstock trả 1.516 mã đang giao dịch tại lần kiểm tra 08/11/2026; lịch sử giá được nhập dần theo lô, xem `symbolCoverage` ở `/api/v1/market/data-status`.
 
 Worker Compose hiện:
 
 - Đồng bộ symbol lúc khởi động.
-- Nếu provider chưa có bar nào, ingest lịch sử ban đầu khoảng 730 ngày.
+- Với CSV/danh sách giới hạn: nếu provider chưa có bar nào, ingest lịch sử ban đầu khoảng 730 ngày. Với `VNSTOCK_SYMBOLS=ALL`: nhập lịch sử hai năm từng lô 50 mã, lưu checkpoint và giữ lại 20% hạn mức tài khoản.
 - Tính lại news event study sau ingest tin và sau ingest EOD.
 - Chạy RSS mỗi 15 phút khi NEWS_FEED_ENABLED=true.
 - Chạy ingest giá lịch sử EOD lúc 15:40 giờ Việt Nam các ngày thứ Hai–thứ Sáu.
@@ -167,11 +167,11 @@ Các bảng chính:
 - Tài khoản: users, refresh_tokens, watchlist_items, portfolio_positions, portfolio_transactions.
 - Backtest: backtest_runs.
 
-Alembic revisions từ 0001_initial_schema tới 0008_news_event_studies. Compose chạy alembic upgrade head trước khi bật backend. Kiểm tra head bằng docker compose exec backend alembic current.
+Alembic revisions từ 0001_initial_schema tới 0009_universe_sync_attempts. Compose chạy alembic upgrade head trước khi bật backend. Kiểm tra head bằng docker compose exec backend alembic current.
 
 ## 8. Tài khoản, portfolio, backtest và AI
 
-- Auth dùng email/password, access JWT và refresh cookie HTTP-only. Register/login có rate limit; Redis dùng nếu cấu hình được, nếu không có in-memory fallback.
+- Auth dùng email/password, access JWT và refresh cookie HTTP-only. Register/login có giới hạn riêng theo email và IP; production dùng Redis và trả 503 nếu Redis lỗi, development/test có thể đếm trong bộ nhớ.
 - Watchlist và portfolio được phân tách theo user.
 - API portfolio ghi giao dịch người dùng và tính position; không gửi lệnh tới công ty chứng khoán.
 - Backtest hỗ trợ buy-and-hold, DCA, SMA crossover và RSI mean reversion; kết quả lưu riêng cho user. Đây là thử nghiệm giả lập, không phải performance tương lai.
@@ -210,7 +210,9 @@ Compose giữ database trong volume postgres_data. docker compose down dừng st
 | Tên | Ý nghĩa/giá trị hiện tại |
 |---|---|
 | MARKET_PROVIDER | csv mặc định; hiện chỉ csv và vnstock được factory chấp nhận. |
-| VNSTOCK_API_KEY | Key đăng nhập vnstock nếu entitlement và adapter cần. Chỉ giữ ở môi trường backend/worker. |
+| VNSTOCK_API_KEY | Key Community cho chạy Vnstock cục bộ. Chỉ giữ ở môi trường backend/worker. |
+| VNSTOCK_SYMBOLS | `ALL` là mặc định khi dùng Vnstock: HOSE/HNX/UPCOM, không gồm DELISTED. Có thể dùng danh sách mã để thử nghiệm. |
+| PROVIDER_RPM | Trần nhịp gọi provider; mặc định 60/phút, Vnstock còn giữ nhịp 6 giây/lượt theo cấu hình riêng. |
 | NEWS_FEED_ENABLED | true bật RSS đã được chủ dự án cho phép; false trả trạng thái disabled/rỗng. |
 | DATABASE_URL | PostgreSQL async URL. Compose nối tới service db. |
 | REDIS_URL | Redis URL. Compose nối tới service redis. |
@@ -236,7 +238,7 @@ FinSight hiện hỗ trợ daily bars về mặt database. Muốn dashboard có 
 |---|---|---|
 | DNSE OpenAPI | Muốn thử một API thị trường chính thức, có REST cho OHLC lịch sử và nhiều loại dữ liệu thị trường | Tài liệu có endpoint OHLC cổ phiếu/chỉ số, quote/khớp lệnh và ngày làm việc. REST yêu cầu API key và chữ ký HMAC; phải đăng ký dịch vụ. Hỏi DNSE bằng văn bản về entitlement dữ liệu, EOD/realtime/delay, quyền lưu/hiển thị cho người dùng, quota, phí, coverage/lịch sử và adjusted prices. |
 | SSI FastConnect Data | Muốn EOD/realtime và có thể cần streaming | Tài liệu mô tả EOD/realtime, API daily/intraday và streaming. Đăng ký dịch vụ hiện cần tài khoản SSI và làm thủ tục qua quầy/nhân viên; credentials gồm ConsumerID, ConsumerSecret, PrivateKey, và cần đăng ký IP cố định. Hỏi về phí, quota, quyền public display, lịch sử và adjusted data. |
-| vnstock 5 | Thử nghiệm cá nhân/đồ án trong phạm vi license | Là toolkit nối tới nguồn bên thứ ba, không phải chủ sở hữu dữ liệu. Cài từ package index chính thức, kiểm tra tier/key, nguồn thực tế, quota và license dữ liệu. License hiện hành nêu Community cho cá nhân/học tập/nghiên cứu và yêu cầu thỏa thuận riêng bằng văn bản nếu sản phẩm chính cung cấp cho bên thứ ba khả năng truy xuất dữ liệu. Adapter repo chưa nằm trong Docker mặc định. |
+| vnstock 5 | Thử nghiệm cá nhân/đồ án trong phạm vi license | Là toolkit nối tới nguồn bên thứ ba, không phải chủ sở hữu dữ liệu. Compose cài gói khi `INSTALL_VNSTOCK=true`; Community chỉ có một thiết bị. Quyền dùng phần mềm không cấp quyền phân phối công khai dữ liệu nguồn. |
 | CSV demo | UI, CI, offline và review | Luôn chạy được; không được gọi là dữ liệu thị trường thật. |
 
 Tham khảo chính thức đã kiểm tra ngày 07/11/2026:
@@ -320,12 +322,12 @@ Khi adapter đã được implement/test:
 ## 12. Chuyển provider và API hiện tại: điều không nên làm
 
 - Không chỉ đổi MARKET_PROVIDER=dnse hoặc ssi: các tên này hiện chưa hợp lệ trong factory.
-- Không bật MARKET_PROVIDER=vnstock trong Docker hiện tại mà chưa cài package; image không cài requirements-vnstock.txt.
+- Với Vnstock cục bộ, đặt cả `MARKET_PROVIDER=vnstock` và `INSTALL_VNSTOCK=true`; backend/worker dùng chung volume định danh thiết bị.
 - Không mặc định vnstock license cho phần mềm cũng cấp quyền nguồn dữ liệu hoặc public redistribution.
 - Không kết luận dữ liệu là live dựa trên việc UI tự refresh mỗi 10 giây.
 - Không dùng close thường thay adjusted close cho event study nếu chưa xử lý chia tách/cổ tức.
 - Không chuyển API key từ backend sang biến NEXT_PUBLIC_*.
-- Không chạy backfill toàn bộ mã cho tới khi biết quota/giới hạn và được phép.
+- Backfill toàn bộ mã dùng lô có checkpoint và ngưỡng quota; không bỏ qua nhịp gọi Vnstock để đẩy nhanh một cách thiếu kiểm soát.
 
 ## 13. Stage plan và tiến độ
 
@@ -339,7 +341,7 @@ Kế hoạch tổng ở IMPLEMENTATION_PLAN.md. Tóm tắt hiện trạng:
 | F3 | API v1 | Các route market, stocks, news, account và backtests có. |
 | F4 | RSS news | RSS, dedupe, attribution, heuristic sentiment, bật/tắt và empty state có. |
 | F5 | T+1/T+5 | Event study versioned có; synthetic/thiếu adjusted data không cho số đo. |
-| F6 | Nối UI | Market/news/stock dùng API client v1, có loading/empty/error và metadata nguồn; một số API legacy vẫn còn. |
+| F6 | Nối UI | Market/news/stock dùng API client v1, có loading/empty/error và metadata nguồn; route legacy đã gỡ ở BE-05. |
 | F7 | Tích hợp, QA và tài liệu | Compose, migration, endpoint smoke test, backend test/lint, frontend TypeScript/build và responsive đã kiểm tra trong local. |
 
 ## 14. Đánh giá độc lập đề nghị cho agent tiếp theo

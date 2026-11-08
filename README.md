@@ -63,6 +63,8 @@ docker compose up --build
 - Readiness (Compose): http://localhost:8000/ready
 - API v1 qua frontend: http://localhost:3000/api/v1/market/overview
 
+Để chạy dữ liệu Vnstock Community cục bộ, đặt `MARKET_PROVIDER=vnstock`, `INSTALL_VNSTOCK=true`, `VNSTOCK_API_KEY` và `VNSTOCK_SYMBOLS=ALL` trong `.env`. Worker nhập danh mục HOSE/HNX/UPCOM trước, sau đó tải lịch sử giá theo lô; xem tiến độ tại http://localhost:8000/api/v1/market/data-status (`symbolCoverage`). Bản Render công khai vẫn dùng CSV demo. Xem [hướng dẫn Vnstock](backend/VNSTOCK_SETUP.md).
+
 ---
 
 ## Chạy local 1-click trên Windows
