@@ -1,9 +1,10 @@
+import inspect
 from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from services.ai_service import chat as ai_chat_service, explain as ai_explain_service
+from services.ai_service import chat_async as ai_chat_service, explain_async as ai_explain_service
 from services.stock_service import get_data_sources, get_market_status
 
 
@@ -37,15 +38,17 @@ def market_status():
 
 
 @router.post("/ai/explain")
-def explain_market(request: ExplainRequest):
-    return ai_explain_service(request.model_dump())
+async def explain_market(request: ExplainRequest):
+    result = ai_explain_service(request.model_dump())
+    return await result if inspect.isawaitable(result) else result
 
 
 @router.post("/ai/chat")
-def chat_market(request: ChatRequest):
+async def chat_market(request: ChatRequest):
     context = {
         "type": request.context_type,
         "title": request.context_title,
         "data": request.context_data,
     }
-    return {"response": ai_chat_service(request.question, context=context)}
+    result = ai_chat_service(request.question, context=context)
+    return {"response": await result if inspect.isawaitable(result) else result}

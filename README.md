@@ -31,7 +31,7 @@ FinSight là ứng dụng phân tích thị trường chứng khoán Việt Nam.
 
 **Backend**
 - FastAPI + Python 3.10+
-- Adapter provider; CSV synthetic là mặc định cho demo, vnstock chỉ là adapter local tùy chọn khi tài khoản và quyền dùng dữ liệu cho phép
+- Adapter provider; CSV synthetic dùng cho demo local, Vnstock là nguồn giá thật được chủ dự án dự định dùng cho bản Render công khai theo xác nhận của chủ dự án về trao đổi với nhà cung cấp
 - SQLAlchemy async + Alembic + PostgreSQL; Redis tùy chọn cho cache/rate-limit
 - OpenRouter AI (`deepseek/deepseek-chat-v3.1`) — commentary và explain
 - TTL-based in-memory caching (commentary 10 min, history 15 min, news 10 min)
@@ -63,7 +63,7 @@ docker compose up --build
 - Readiness (Compose): http://localhost:8000/ready
 - API v1 qua frontend: http://localhost:3000/api/v1/market/overview
 
-Để chạy dữ liệu Vnstock Community cục bộ, đặt `MARKET_PROVIDER=vnstock`, `INSTALL_VNSTOCK=true`, `VNSTOCK_API_KEY` và `VNSTOCK_SYMBOLS=ALL` trong `.env`. Worker nhập danh mục HOSE/HNX/UPCOM, lấy bảng giá nhiều mã trong một request (mỗi 5 phút trong phiên), rồi tải lịch sử hai năm theo lô riêng. Bảng giá ở http://localhost:8000/api/v1/market/board; tiến độ lịch sử ở http://localhost:8000/api/v1/market/data-status. Bản Render công khai vẫn dùng CSV demo. Xem [hướng dẫn Vnstock](backend/VNSTOCK_SETUP.md) và [kiến trúc dữ liệu thị trường](docs/market-data-architecture.md).
+Để chạy dữ liệu Vnstock Community cục bộ, đặt `MARKET_PROVIDER=vnstock`, `INSTALL_VNSTOCK=true`, `VNSTOCK_API_KEY` và `VNSTOCK_SYMBOLS=ALL` trong `.env`. Worker nhập danh mục HOSE/HNX/UPCOM, lấy bảng giá nhiều mã trong một request (mỗi 5 phút trong phiên), rồi tải lịch sử hai năm theo lô riêng. Bảng giá ở http://localhost:8000/api/v1/market/board; tiến độ lịch sử ở http://localhost:8000/api/v1/market/data-status. Bản Render mục tiêu dùng Vnstock cho dữ liệu thật; chỉ worker giữ API key và định danh thiết bị trên persistent disk riêng. Xem [hướng dẫn Vnstock](backend/VNSTOCK_SETUP.md), [kiến trúc dữ liệu thị trường](docs/market-data-architecture.md) và [vận hành production](docs/production-operations.md).
 
 ---
 
@@ -121,10 +121,10 @@ Truy cập http://localhost:3000.
 | `BACKEND_API_URL` | Backend upstream cho Next.js proxy; unified Docker mặc định dùng localhost nội bộ | Không |
 | `DATABASE_URL` | Chuỗi kết nối PostgreSQL async | Không khi chạy bằng Compose |
 | `REDIS_URL` | Redis URL; readiness kiểm tra nếu được cấu hình | Không |
-| `MARKET_PROVIDER` | `csv` (mặc định, synthetic demo) hoặc `vnstock` (thử nghiệm cục bộ; xem `backend/VNSTOCK_SETUP.md`) | Không |
+| `MARKET_PROVIDER` | `csv` (mặc định cho demo local) hoặc `vnstock` (provider thật; xem `backend/VNSTOCK_SETUP.md`) | Không |
 | `NEWS_FEED_ENABLED` | `true` bật RSS VnExpress/VnEconomy cho API và worker; tắt bằng `false` | Không |
 | `JWT_SECRET` | Secret ký access token; production phải dùng chuỗi ngẫu nhiên riêng | Có ở production |
-| `VNSTOCK_API_KEY` | Key Community miễn phí cho adapter cục bộ; không cấu hình cho public demo | Tùy chọn |
+| `VNSTOCK_API_KEY` | Key Community; chỉ đặt trong môi trường backend worker, không đặt ở frontend hay public web service | Tùy chọn |
 | `INSTALL_VNSTOCK` | Đặt `true` để cài gói Vnstock vào image Docker cục bộ | Không |
 | `VNSTOCK_SYMBOLS` | `ALL` lấy danh mục HOSE/HNX/UPCOM; có thể dùng danh sách mã để giới hạn | Không |
 | `VNSTOCK_REQUEST_DELAY_SECONDS` | Khoảng nghỉ giữa các lần lấy lịch sử cổ phiếu (mặc định 6 giây) | Không |
@@ -133,7 +133,7 @@ Truy cập http://localhost:3000.
 
 ## Deploy một URL trên Render
 
-`render.yaml` khai báo unified web service, worker, PostgreSQL và Key Value. Public demo mặc định dùng CSV synthetic; không bật provider thật nếu chưa xác nhận quyền truy cập, lưu trữ và hiển thị dữ liệu từ nguồn. Có thể cấu hình `OPENROUTER_API_KEY` nếu muốn AI upstream. Sau deploy, kiểm tra `/ready`, `/api/v1/market/overview` và `/api/v1/stocks?limit=10`. Render services/database có thể phát sinh phí tùy plan; xác nhận chi phí trong dashboard trước khi provision.
+`render.yaml` khai báo web service, worker, PostgreSQL và Key Value. Hướng triển khai hiện tại dùng Vnstock cho dữ liệu giá thật theo xác nhận của chủ dự án rằng họ đã hỏi nhà cung cấp và có thể dùng dữ liệu công khai. Đây là attestation của chủ dự án; README không khẳng định có văn bản cấp quyền hay mở rộng phạm vi điều khoản. Worker là tiến trình duy nhất kết nối Vnstock, dùng một persistent disk trả phí để giữ device identity; web đọc bars/snapshots đã lưu trong PostgreSQL. Không scale worker thành nhiều instance hoặc để web gọi thẳng provider. Nếu provider lỗi, hiển thị stale/lỗi/no-data, tuyệt đối không âm thầm chuyển sang CSV. Xem checklist deploy và kiểm tra tại [production operations](docs/production-operations.md). Có thể cấu hình `OPENROUTER_API_KEY` nếu muốn AI upstream. Render services/database/disk có thể phát sinh phí tùy plan; kiểm tra chi phí trong dashboard trước khi provision.
 
 Trước khi provision môi trường công khai, xem [production operations readiness](docs/production-operations.md) về secret hygiene, backup/restore và monitoring.
 
@@ -180,10 +180,10 @@ finsight/
 
 ## Dữ liệu
 
-- Giá cổ phiếu: provider CSV synthetic mặc định; vnstock v5 là tuỳ chọn local, chưa bật cho public demo khi chưa xác nhận quyền dữ liệu.
-- Danh mục mã/ngành: CSV synthetic mặc định; vnstock v5 là tuỳ chọn local.
+- Giá cổ phiếu: Vnstock v5 là provider giá thật cho triển khai mục tiêu; CSV synthetic dành cho demo local. Chủ dự án xác nhận đã hỏi nhà cung cấp và được phép dùng dữ liệu công khai; phạm vi trả lời/điều khoản không được mô tả thêm ở đây.
+- Danh mục mã/ngành: Vnstock v5 cho triển khai thật; CSV synthetic dành cho demo local.
 - Tin tức: RSS VnExpress/VnEconomy, bật cho Render và Docker Compose sau khi chủ dự án xác nhận quyền lưu/hiển thị; bài giữ tên nhà xuất bản và liên kết nguồn. Kiểm tra lại điều khoản trước khi đổi mục đích phân phối.
 - AI: OpenRouter — `deepseek/deepseek-chat-v3.1`; market commentary dashboard hiển thị rule-based snapshot, không gắn nhãn là AI
-- Local Compose mặc định dùng dữ liệu **synthetic demo** tạo bởi `backend/scripts/generate_demo_data.py`, có `data_mode=synthetic-demo` và `source=csv-demo`; không phải giá lịch sử thật.
+- Local Compose mặc định dùng dữ liệu **synthetic demo** tạo bởi `backend/scripts/generate_demo_data.py`, có `data_mode=synthetic-demo` và `source=csv-demo`; không phải giá lịch sử thật. Render mục tiêu dùng `vnstock` và các hàng dữ liệu thật đã lưu trong PostgreSQL.
 - Khi provider thật lỗi, app không thay bằng giá demo tĩnh; nguồn/giá không có phải hiển thị lỗi hoặc `null`.
 - v1 JSON camelCase, prefix `/api/v1`; các route cũ còn lại cho tương thích trong lúc chuyển frontend.

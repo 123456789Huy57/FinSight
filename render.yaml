@@ -14,7 +14,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: MARKET_PROVIDER
-        value: csv
+        value: vnstock
       - key: PROVIDER_RPM
         value: "60"
       - key: CORS_ORIGINS
@@ -44,11 +44,26 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerCommand: python3 /app/backend/worker.py
+    plan: 0.5c-512mb
+    disk:
+      name: vnstock-auth
+      mountPath: /data/vnstock
+      sizeGB: 1
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: MARKET_PROVIDER
-        value: csv
+        value: vnstock
+      - key: INSTALL_VNSTOCK
+        value: "true"
+      - key: VNSTOCK_HOME
+        value: /data/vnstock
+      - key: VNSTOCK_API_KEY
+        sync: false
+      - key: VNSTOCK_SYMBOLS
+        value: ALL
+      - key: VNSTOCK_REQUEST_DELAY_SECONDS
+        value: "6"
       - key: PROVIDER_RPM
         value: "60"
       - key: CORS_ORIGINS

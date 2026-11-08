@@ -6,6 +6,7 @@ the first user request reads a warm cache instead of waiting for every batch.
 """
 
 import asyncio
+import importlib.util
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -27,6 +28,16 @@ from providers.factory import get_configured_market_source_id
 
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def validate_provider_ready() -> None:
+    """Fail at startup instead of leaving a real-data worker silently stale."""
+    if settings.market_provider.lower() != "vnstock":
+        return
+    if not settings.vnstock_api_key:
+        raise RuntimeError("VNSTOCK_API_KEY is required for the Vnstock worker")
+    if importlib.util.find_spec("vnstock") is None:
+        raise RuntimeError("Vnstock package is missing; build the worker with INSTALL_VNSTOCK=true")
 
 
 async def _initial_sync() -> None:
@@ -110,6 +121,7 @@ async def _run_quote_board() -> None:
 
 
 async def main() -> None:
+    validate_provider_ready()
     await _initial_sync()
     scheduler = AsyncIOScheduler(timezone=VN_TZ)
     if settings.news_feed_enabled:

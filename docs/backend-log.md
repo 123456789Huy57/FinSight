@@ -98,3 +98,9 @@
 - Truy cập Docker bằng quyền phù hợp: backend, frontend, PostgreSQL, Redis và worker đều chạy; API báo `source=vnstock`, bảng KBS có 1.516 mã, 930 mã có giá khớp. Lịch sử VCI có 869 mã, 555 mã tới ngày VN-Index 06/11; backfill chưa hoàn tất.
 - `alembic upgrade head` và full backend pytest qua: 69 test, domain coverage 87,91%. Worker cũ đã nhập thêm nhiều lô; một lô lỗi nguồn VCI và job kế tiếp đã chạy. Build lại riêng worker để áp dụng sửa checkpoint, giữ database và volume thiết bị; log xác nhận đồng bộ danh mục 1.516 mã.
 - Cấu hình Render vẫn là `csv-demo`; quyền hiển thị công khai dữ liệu KBS/VCI chưa được xác nhận. Bản local dùng giá thật, không phải CSV demo.
+
+## RENDER-VERIFY — kiểm tra trước khi commit/deploy
+- Đổi đường AI của API sang async route/service; web đọc bars và quote đã lưu qua `AsyncSession`, không gọi provider trực tiếp và không dùng `asyncio.run` trong request production. Thêm test cho dữ liệu database và kiểm tra worker yêu cầu key/package.
+- Build image production với `INSTALL_VNSTOCK=true` thành công; `.dockerignore` loại `.env`, dependency và build output. `docker compose config --quiet` qua.
+- Kiểm tra: Ruff, mypy, 73 backend test với coverage domain 87,91%, frontend lint, 13 test, build đều qua. Docker Compose smoke test: `/ready`, API data-status, `/`, `/market` đều HTTP 200; worker đồng bộ 1.516 mã.
+- API local báo `source=vnstock`, `dataMode=market-provider`, trạng thái `stale`; coverage tại lần kiểm tra là 1.121 mã có lịch sử và 715 mã tới ngày chỉ số. Chưa deploy Render hoặc push branch.

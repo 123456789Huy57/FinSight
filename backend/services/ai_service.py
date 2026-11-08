@@ -2,20 +2,125 @@ from __future__ import annotations
 
 import json
 import os
+import asyncio
 from typing import Any, Dict
 
 import pandas as pd
 import requests
 import re
 
-from services.stock_service import SECTOR_MAP, get_stock_history
+from sqlalchemy import select
+
+from db.models import MarketSnapshot, PriceBar
+from db.session import AsyncSessionLocal
+from providers.factory import get_configured_market_source_id
+from services.stock_service import SECTOR_MAP
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
+async def _load_price_bars(symbol: str, limit: int = 252) -> list[PriceBar]:
+    source = get_configured_market_source_id()
+    async with AsyncSessionLocal() as session:
+        return list((await session.scalars(
+            select(PriceBar).where(PriceBar.symbol == symbol.upper(), PriceBar.source == source)
+            .order_by(PriceBar.trade_date.desc()).limit(limit)
+        )).all())
+
+
+def _read_history(symbol: str) -> pd.DataFrame:
+    bars = asyncio.run(_load_price_bars(symbol))
+    bars.reverse()
+    return pd.DataFrame({"close": [float(bar.close) for bar in bars]})
+
+
+async def _load_quote(symbol: str) -> dict[str, Any] | None:
+    source = get_configured_market_source_id()
+    async with AsyncSessionLocal() as session:
+        snapshot = await session.scalar(
+            select(MarketSnapshot).where(MarketSnapshot.payload["source"].as_string() == source)
+            .order_by(MarketSnapshot.as_of.desc()).limit(1)
+        )
+        if snapshot is not None:
+            item = next((row for row in snapshot.payload.get("items", [])
+                         if str(row.get("symbol", "")).upper() == symbol.upper()), None)
+            if item is not None and item.get("price") is not None:
+                return {
+                    "current_price": item["price"], "price_change": item.get("change"),
+                    "percent_change": item.get("percentChange"), "volume": item.get("volume"),
+                }
+        bars = list((await session.scalars(
+            select(PriceBar).where(PriceBar.symbol == symbol.upper(), PriceBar.source == source)
+            .order_by(PriceBar.trade_date.desc()).limit(2)
+        )).all())
+    if not bars:
+        return None
+    latest = bars[0]
+    previous = bars[1] if len(bars) > 1 else None
+    change = float(latest.close - previous.close) if previous else None
+    return {
+        "current_price": float(latest.close), "price_change": change,
+        "percent_change": change / float(previous.close) * 100 if change is not None and previous.close else None,
+        "volume": latest.volume,
+    }
+
+
+def _read_quote(symbol: str) -> dict[str, Any] | None:
+    return asyncio.run(_load_quote(symbol))
+
+
+async def _technical_snapshot_async(symbol: str) -> Dict[str, Any] | None:
+    try:
+        bars = await _load_price_bars(symbol)
+        bars.reverse()
+        history = pd.DataFrame({"close": [float(bar.close) for bar in bars]})
+        if history.empty:
+            return None
+
+        close_raw = pd.to_numeric(history["close"], errors="coerce").dropna()
+        if len(close_raw) < 10:
+            return None
+
+        ma20 = close_raw.rolling(20).mean().iloc[-1] if len(close_raw) >= 20 else close_raw.mean()
+        ma50 = close_raw.rolling(50).mean().iloc[-1] if len(close_raw) >= 50 else close_raw.mean()
+        delta = close_raw.diff()
+        gain = delta.clip(lower=0).rolling(14).mean()
+        loss = (-delta.clip(upper=0)).rolling(14).mean()
+        rs = gain / loss.replace(0, pd.NA)
+        last_rs = rs.iloc[-1]
+        rsi = 100 - (100 / (1 + last_rs)) if pd.notna(last_rs) else None
+
+        last = float(close_raw.iloc[-1])
+        prev = float(close_raw.iloc[-2]) if len(close_raw) >= 2 else last
+        ret_5d = ((last / float(close_raw.iloc[-6])) - 1) * 100 if len(close_raw) >= 6 else None
+        ret_20d = ((last / float(close_raw.iloc[-21])) - 1) * 100 if len(close_raw) >= 21 else None
+        trend = "uptrend" if last > ma20 > ma50 else "downtrend" if last < ma20 < ma50 else "sideways"
+        return {
+            "last_price": round(last, 0),
+            "daily_change_pct": round(((last / prev) - 1) * 100, 2) if prev else None,
+            "ma20": round(float(ma20), 0) if pd.notna(ma20) else None,
+            "ma50": round(float(ma50), 0) if pd.notna(ma50) else None,
+            "rsi14": round(float(rsi), 2) if rsi is not None and pd.notna(rsi) else None,
+            "ret_5d_pct": round(float(ret_5d), 2) if ret_5d is not None else None,
+            "ret_20d_pct": round(float(ret_20d), 2) if ret_20d is not None else None,
+            "trend": trend,
+        }
+    except Exception:
+        return None
+
+
+async def _merge_analysis_context_async(payload: Dict[str, Any]) -> Dict[str, Any]:
+    merged = dict(payload)
+    symbol = str(merged.get("symbol") or "").upper().strip()
+    if symbol:
+        merged["technical_snapshot"] = await _technical_snapshot_async(symbol)
+        merged["sector"] = SECTOR_MAP.get(symbol)
+    return merged
+
+
 def _technical_snapshot(symbol: str) -> Dict[str, Any] | None:
     try:
-        history = get_stock_history(symbol)
+        history = _read_history(symbol)
         if not isinstance(history, pd.DataFrame) or history.empty:
             return None
 
@@ -27,8 +132,6 @@ def _technical_snapshot(symbol: str) -> Dict[str, Any] | None:
         if len(close_raw) < 10:
             return None
 
-        # VCI returns prices in thousands of VND — scale to full VND for display
-        price_scale = 1000.0 if close_raw.median() < 1000 else 1.0
         close = close_raw  # keep unscaled for ratio calculations (RSI, returns)
 
         ma20 = close.rolling(20).mean().iloc[-1] if len(close) >= 20 else close.mean()
@@ -48,10 +151,10 @@ def _technical_snapshot(symbol: str) -> Dict[str, Any] | None:
 
         trend = "uptrend" if last > ma20 > ma50 else "downtrend" if last < ma20 < ma50 else "sideways"
         return {
-            "last_price": round(last * price_scale, 0),
+            "last_price": round(last, 0),
             "daily_change_pct": round(((last / prev) - 1) * 100, 2) if prev else None,
-            "ma20": round(float(ma20) * price_scale, 0) if pd.notna(ma20) else None,
-            "ma50": round(float(ma50) * price_scale, 0) if pd.notna(ma50) else None,
+            "ma20": round(float(ma20), 0) if pd.notna(ma20) else None,
+            "ma50": round(float(ma50), 0) if pd.notna(ma50) else None,
             "rsi14": round(float(rsi), 2) if rsi is not None and pd.notna(rsi) else None,
             "ret_5d_pct": round(float(ret_5d), 2) if ret_5d is not None else None,
             "ret_20d_pct": round(float(ret_20d), 2) if ret_20d is not None else None,
@@ -365,6 +468,28 @@ def explain(payload: Dict[str, Any]) -> Dict[str, Any]:
         return _mock_explanation(payload)
 
 
+async def explain_async(payload: Dict[str, Any]) -> Dict[str, Any]:
+    payload = await _merge_analysis_context_async(payload)
+    system = (
+        "Bạn là FinSight AI — chuyên gia phân tích tài chính thị trường chứng khoán Việt Nam. "
+        "Nhiệm vụ: giải thích ngắn gọn, rõ ràng, chuyên sâu bằng tiếng Việt cho nhà đầu tư cá nhân. "
+        "Phân tích PHẢI bao gồm cả Phân tích kỹ thuật (TA) và Phân tích cơ bản (FA). "
+        "KHÔNG đưa khuyến nghị mua/bán/nắm giữ. Trả lời ĐÚNG định dạng JSON thuần."
+    )
+    try:
+        content = await asyncio.to_thread(
+            _call_openrouter,
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+        )
+        parsed = _parse_json_response(content)
+        return parsed if parsed and "summary" in parsed else _mock_explanation(payload)
+    except Exception:
+        return _mock_explanation(payload)
+
+
 def generate_market_commentary(market_data: Dict[str, Any]) -> Dict[str, Any]:
     """Generate AI-powered market commentary from real market data."""
     system = (
@@ -437,20 +562,15 @@ def chat(question: str, context: Dict[str, Any] | None = None) -> str:
 
     user_payload = {"question": question, "context": merged}
 
-    # If we have a symbol in merged context, fetch live quote and attach snapshot/technical data
+    # Enrich from persisted data only; the web process must not call provider APIs.
     symbol = (merged.get("symbol") or (merged.get("data") or {}).get("symbol") or "").strip()
     if symbol:
         try:
-            # live quote (if available)
-            from services.stock_service import get_quote as _get_quote
-            quote = _get_quote(symbol)
+            quote = _read_quote(symbol)
             if quote and isinstance(quote, dict):
                 merged.setdefault("snapshot", {})
-                # map common keys safely
-                if quote.get("last_price") is not None:
-                    merged["snapshot"]["last_price"] = quote.get("last_price")
-                elif quote.get("price") is not None:
-                    merged["snapshot"]["last_price"] = quote.get("price")
+                if quote.get("current_price") is not None:
+                    merged["snapshot"]["last_price"] = quote.get("current_price")
                 if quote.get("volume") is not None:
                     merged["snapshot"]["volume"] = quote.get("volume")
         except Exception:
@@ -491,3 +611,51 @@ def chat(question: str, context: Dict[str, Any] | None = None) -> str:
         first = summary_parts[0] if summary_parts else (parts[0].strip() if parts else '')
         concl = f"Kết luận: {first}"
         return " ".join(summary_parts + [concl])
+
+
+async def chat_async(question: str, context: Dict[str, Any] | None = None) -> str:
+    context = context or {}
+    merged = await _merge_analysis_context_async({**context, "question": question})
+    symbol = (merged.get("symbol") or (merged.get("data") or {}).get("symbol") or "").strip()
+    if symbol:
+        quote = await _load_quote(symbol)
+        if quote:
+            merged.setdefault("snapshot", {})
+            if quote.get("current_price") is not None:
+                merged["snapshot"]["last_price"] = quote["current_price"]
+            if quote.get("volume") is not None:
+                merged["snapshot"]["volume"] = quote["volume"]
+        technical = await _technical_snapshot_async(symbol)
+        if technical:
+            merged["technical_snapshot"] = {**(merged.get("technical_snapshot") or {}), **technical}
+
+    system = (
+        "Bạn là FinSight, chuyên gia phân tích thị trường Việt Nam. "
+        "Trả lời bằng tiếng Việt, ngắn gọn, không khuyến nghị mua/bán. "
+        "Cuối câu trả lời thêm một câu bắt đầu bằng 'Kết luận:'."
+    )
+    try:
+        content = await asyncio.to_thread(
+            _call_openrouter,
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(
+                    {"question": question, "context": merged}, ensure_ascii=False
+                )},
+            ],
+        )
+        text = re.sub(r"\s+", " ", (content or "").strip())
+        parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
+        summary_parts = parts[:2]
+        conclusion = next(
+            (f"Kết luận: {match.group(2).strip()}" for match in
+             [re.search(r"(?i)(kết luận)[:\-]?\s*(.+?)(?=[.!?]\s|$)", text)]
+             if match),
+            f"Kết luận: {summary_parts[0]}" if summary_parts else "Kết luận: Chưa đủ dữ liệu.",
+        )
+        return " ".join(summary_parts + [conclusion])
+    except Exception:
+        raw = _mock_chat(question, context=merged)
+        parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", raw) if part.strip()]
+        first = parts[0] if parts else "Chưa đủ dữ liệu."
+        return f"{first} Kết luận: {first}"
