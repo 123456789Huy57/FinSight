@@ -77,3 +77,19 @@
 - Chủ tài khoản đã gỡ thiết bị Vnstock cũ; restart worker đăng ký danh mục thành công. Phát hiện image worker còn bản cũ, chưa có `_run_quote_board`; build lại riêng worker, giữ `.env` và volume `vnstock_auth`.
 - Worker mới nhập snapshot KBS: 1.516/1.516 mã trả về, 930 có giá khớp, 1.516 có giá tham chiếu; `/api/v1/market/board` báo `current`, FPT 50.800/TC 52.900. Job lịch sử mới ở trạng thái `running`.
 - Không đổi key, không reset volume hay database. Ghi cách build đủ worker trong `backend/VNSTOCK_SETUP.md`.
+
+## BE-09 — request ID an toàn
+- Chỉ nhận request ID tối đa 128 ký tự chữ, số, `.`, `_`, `-`; giá trị khác được thay UUID trước khi ghi log/phản hồi. Cập nhật mục P2 trong `docs/security-review.md`.
+- Kiểm tra: 2 test mới, Ruff toàn backend và mypy domain qua. Docker Engine không cho truy cập nên chưa chạy test tích hợp/migration trong Compose.
+
+## BE-VN-HISTORY — checkpoint từng mã thành công
+- Job lưu tên mã lấy lịch sử lỗi và chỉ checkpoint các mã đã xử lý; mã lỗi được thử lại, các mã thành công không cần gọi lại cả lô. Số `remaining` còn tính cả mã lỗi.
+- Kiểm tra: 3 test `test_sync_universe.py` qua; Ruff và mypy qua. Chưa xác minh tiến độ 1.516 mã trên database vì Docker Engine từ chối truy cập. Full pytest không có kết quả khi thiếu PostgreSQL, đã dừng sau 50 giây.
+
+## OPS-01 — chuẩn bị vận hành
+- Viết `docs/production-operations.md` và liên kết từ README: quyền dữ liệu, cấu hình, backup/restore, health, giám sát và xử lý sự cố. Chưa triển khai công khai.
+- Kiểm tra: `docker compose config --quiet`, `git diff --check` qua. Chưa có tên miền và xác nhận quyền công bố nguồn giá thật.
+
+## FE-QA — rà mã nguồn và kiểm tra frontend
+- Rà các trang chính và mobile bằng mã nguồn; không thấy P0/P1. TopNav còn một lượt polling `/market/status` mỗi phút có thể trùng với trang, mức P2.
+- Kiểm tra: `npm run lint`, `npm test` (13 test), `npm run build` qua. Chưa chụp ảnh trình duyệt vì môi trường hiện không cho truy cập Docker/localhost.

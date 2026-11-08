@@ -135,6 +135,8 @@ Truy cập http://localhost:3000.
 
 `render.yaml` khai báo unified web service, worker, PostgreSQL và Key Value. Public demo mặc định dùng CSV synthetic; không bật provider thật nếu chưa xác nhận quyền truy cập, lưu trữ và hiển thị dữ liệu từ nguồn. Có thể cấu hình `OPENROUTER_API_KEY` nếu muốn AI upstream. Sau deploy, kiểm tra `/ready`, `/api/v1/market/overview` và `/api/v1/stocks?limit=10`. Render services/database có thể phát sinh phí tùy plan; xác nhận chi phí trong dashboard trước khi provision.
 
+Trước khi provision môi trường công khai, xem [production operations readiness](docs/production-operations.md) về secret hygiene, backup/restore và monitoring.
+
 ---
 
 ## Cấu trúc dự án
