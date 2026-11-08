@@ -93,3 +93,8 @@
 ## FE-QA — rà mã nguồn và kiểm tra frontend
 - Rà các trang chính và mobile bằng mã nguồn; không thấy P0/P1. TopNav còn một lượt polling `/market/status` mỗi phút có thể trùng với trang, mức P2.
 - Kiểm tra: `npm run lint`, `npm test` (13 test), `npm run build` qua. Chưa chụp ảnh trình duyệt vì môi trường hiện không cho truy cập Docker/localhost.
+
+## BE-VN-VERIFY — xác minh giá thật cục bộ
+- Truy cập Docker bằng quyền phù hợp: backend, frontend, PostgreSQL, Redis và worker đều chạy; API báo `source=vnstock`, bảng KBS có 1.516 mã, 930 mã có giá khớp. Lịch sử VCI có 869 mã, 555 mã tới ngày VN-Index 06/11; backfill chưa hoàn tất.
+- `alembic upgrade head` và full backend pytest qua: 69 test, domain coverage 87,91%. Worker cũ đã nhập thêm nhiều lô; một lô lỗi nguồn VCI và job kế tiếp đã chạy. Build lại riêng worker để áp dụng sửa checkpoint, giữ database và volume thiết bị; log xác nhận đồng bộ danh mục 1.516 mã.
+- Cấu hình Render vẫn là `csv-demo`; quyền hiển thị công khai dữ liệu KBS/VCI chưa được xác nhận. Bản local dùng giá thật, không phải CSV demo.
