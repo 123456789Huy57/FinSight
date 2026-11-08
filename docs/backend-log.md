@@ -72,3 +72,8 @@
 - Trang mã lấy riêng một quote; dashboard cho tin tải độc lập, bỏ request thừa và polling 10 giây. Bản đồ nhiệt dùng top 200 khối lượng EOD và màu theo biên độ thường từng sàn, bỏ nhãn trần/sàn suy đoán.
 - Sau khi Docker mở lại, worker báo thiết bị Vnstock bị vô hiệu hoá; cần chủ tài khoản gỡ thiết bị Docker cũ để worker lấy snapshot KBS mới. Dữ liệu VCI đã lưu vẫn dùng được.
 - Compose cuối: `/market`, `/dashboard`, `/stock/FPT` HTTP 200; bảng có 1.516 mã, 296 mã có nến đúng phiên 06/11, `stale`/`vci-eod`; lượt cache 232 ms. Kiểm tra trực quan cả ba trang. Ruff, mypy, migration và 66 backend test qua (coverage 87,91%); frontend lint, 13 test và build qua.
+
+## BE-VN-RECOVER — khôi phục worker sau gỡ thiết bị
+- Chủ tài khoản đã gỡ thiết bị Vnstock cũ; restart worker đăng ký danh mục thành công. Phát hiện image worker còn bản cũ, chưa có `_run_quote_board`; build lại riêng worker, giữ `.env` và volume `vnstock_auth`.
+- Worker mới nhập snapshot KBS: 1.516/1.516 mã trả về, 930 có giá khớp, 1.516 có giá tham chiếu; `/api/v1/market/board` báo `current`, FPT 50.800/TC 52.900. Job lịch sử mới ở trạng thái `running`.
+- Không đổi key, không reset volume hay database. Ghi cách build đủ worker trong `backend/VNSTOCK_SETUP.md`.
