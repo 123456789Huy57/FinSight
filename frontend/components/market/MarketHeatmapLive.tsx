@@ -11,13 +11,14 @@ const MAX_LIMIT = 200
 
 function toItems(res: ScreenerResponse): HeatmapItem[] {
   return res.stocks
-    .filter((s) => s.percent_change != null)
+    .filter((s) => s.percent_change != null && s.volume != null && s.volume > 0)
     .map((s) => ({
       symbol: s.symbol,
+      exchange: s.exchange,
       name: s.name ?? undefined,
       sector: s.sector || 'Khác',
       cap: s.market_cap ?? null,
-      value: s.trading_value ?? (s.current_price && s.volume ? s.current_price * s.volume : null),
+      volume: s.volume,
       price: s.current_price,
       change: s.percent_change as number,
     }))
@@ -36,7 +37,7 @@ export function MarketHeatmapLive({ height = 520 }: { height?: number }) {
 
   useEffect(() => {
     let alive = true
-    getScreenerData({ limit: MAX_LIMIT, sort: 'marketCap' })
+    getScreenerData({ limit: MAX_LIMIT, sort: 'volume' })
       .then((r) => alive && setRes(r))
       .catch(() => alive && setFailed(true))
     return () => {
@@ -65,11 +66,11 @@ export function MarketHeatmapLive({ height = 520 }: { height?: number }) {
   return (
     <MarketHeatmap
       data={items}
-      exchange={`${items.length} mã`}
+      exchange={`${items.length} mã có khối lượng`}
       height={height}
       note={
         <span title={res.source ? `Nguồn: ${res.source}` : undefined}>
-          {dataModeLabel(res.data_mode)}, tính đến {formatDataAsOf(res.updated_at)}
+          Top {MAX_LIMIT} mã theo khối lượng EOD. {dataModeLabel(res.data_mode)}, tính đến {formatDataAsOf(res.updated_at)}
         </span>
       }
     />

@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timezone
+from time import monotonic
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
@@ -12,6 +13,7 @@ from jobs.ingest_quotes import quote_refresh_due
 from providers.factory import get_configured_market_source_id
 
 router = APIRouter(prefix="/api/v1/market", tags=["v1 market"])
+_fallback_board_cache: tuple[float, dict] | None = None
 
 
 def _configured_data_mode() -> str:
@@ -62,6 +64,7 @@ def _stock_row(symbol: Symbol, bar: PriceBar, previous_close):
 @router.get("/board")
 async def quote_board():
     """Serve one persisted market snapshot; browser requests never call the provider."""
+    global _fallback_board_cache
     source = get_configured_market_source_id()
     if source != "vnstock":
         rows = await _latest_bars()
@@ -75,17 +78,33 @@ async def quote_board():
             .order_by(MarketSnapshot.as_of.desc()).limit(1)
         )
         if snapshot is None:
+            if _fallback_board_cache is not None and monotonic() < _fallback_board_cache[0]:
+                return _fallback_board_cache[1]
             directory = (await session.execute(
                 select(Symbol.symbol, Symbol.name, Symbol.exchange, Symbol.sector)
                 .where(Symbol.is_active.is_(True), Symbol.exchange.in_(("HOSE", "HNX", "UPCOM")))
                 .order_by(Symbol.symbol)
             )).all()
+            # Keep the real VCI daily close visible while the quote provider is
+            # unavailable. It is explicitly marked as stale EOD, never as KBS.
+            bar_rows = await _latest_bars()
+            latest_trade_date = max((row[1].trade_date for row in bar_rows), default=None)
+            daily = {row[0].symbol: _stock_row(*row) for row in bar_rows
+                     if row[1].trade_date == latest_trade_date}
             items = [{"symbol": code, "name": name, "exchange": exchange, "sector": sector,
-                      "price": None, "referencePrice": None, "change": None, "percentChange": None}
+                      "price": daily[code]["price"] if code in daily else None,
+                      "referencePrice": None,
+                      "change": daily[code]["change"] if code in daily else None,
+                      "percentChange": daily[code]["percentChange"] if code in daily else None,
+                      "volume": daily[code]["volume"] if code in daily else None,
+                      "asOf": daily[code]["asOf"] if code in daily else None}
                      for code, name, exchange, sector in directory]
-            return {"items": items, "total": len(items), "source": source,
-                    "dataMode": _configured_data_mode(), "quoteSource": None, "snapshotAt": None,
-                    "status": "no_data"}
+            fallback = {"items": items, "total": len(items), "source": source,
+                        "dataMode": _configured_data_mode(),
+                        "quoteSource": "vci-eod" if daily else None, "snapshotAt": None,
+                        "status": "stale" if daily else "no_data"}
+            _fallback_board_cache = (monotonic() + 60, fallback)
+            return fallback
     now = datetime.now(timezone.utc)
     fresh = (now - snapshot.as_of).total_seconds() < 600 or not quote_refresh_due(now, snapshot.as_of)
     return {"items": snapshot.payload["items"], "total": len(snapshot.payload["items"]),
@@ -95,10 +114,32 @@ async def quote_board():
             "status": "current" if fresh else "stale"}
 
 
+@router.get("/board/{symbol}")
+async def symbol_quote(symbol: str):
+    """Return one row from the same persisted snapshot used by the full board."""
+    code = symbol.strip().upper()
+    board = await quote_board()
+    item = next((row for row in board["items"] if row["symbol"] == code), None)
+    if item is None:
+        return JSONResponse(status_code=404, content={
+            "error": {"code": "SYMBOL_NOT_FOUND", "message": f"Unknown symbol: {code}"}
+        })
+    return {"item": item, "source": board["source"], "dataMode": board["dataMode"],
+            "quoteSource": board["quoteSource"], "snapshotAt": board["snapshotAt"],
+            "status": board["status"]}
+
+
 @router.get("/overview")
 async def overview():
-    rows = await _latest_bars()
-    stocks = [_stock_row(*row) for row in rows]
+    source = get_configured_market_source_id()
+    if source == "vnstock":
+        board = await quote_board()
+        stocks = [{**item, "volume": item.get("volume"), "asOf": board["snapshotAt"] or item.get("asOf"),
+                   "source": source, "dataMode": board["dataMode"]}
+                  for item in board["items"] if item["price"] is not None]
+    else:
+        rows = await _latest_bars()
+        stocks = [_stock_row(*row) for row in rows]
     advancing = sum(1 for item in stocks if item["percentChange"] is not None and item["percentChange"] > 0)
     declining = sum(1 for item in stocks if item["percentChange"] is not None and item["percentChange"] < 0)
     unchanged = sum(1 for item in stocks if item["percentChange"] == 0)
@@ -113,9 +154,8 @@ async def overview():
     ]
     sector_items.sort(key=lambda item: item["percentChange"], reverse=True)
     changes = [item["percentChange"] for item in stocks if item["percentChange"] is not None]
-    source = get_configured_market_source_id()
     return {
-        "asOf": max((item["asOf"] for item in stocks), default=None),
+        "asOf": max((item["asOf"] for item in stocks if item["asOf"]), default=None),
         "source": source,
         "dataMode": _configured_data_mode(),
         "indices": await _index_rows(),
@@ -124,7 +164,8 @@ async def overview():
             "losers": sorted(stocks, key=lambda item: item["percentChange"] if item["percentChange"] is not None else float("inf"))[:10],
         },
         "breadth": {"advancing": advancing, "declining": declining, "unchanged": unchanged,
-                    "totalVolume": sum(item["volume"] or 0 for item in stocks),
+                    "totalVolume": (sum(item["volume"] or 0 for item in stocks)
+                                    if any(item["volume"] is not None for item in stocks) else None),
                     "source": source, "dataMode": _configured_data_mode()},
         "sectors": sector_items,
         "averageChange": sum(changes) / len(changes) if changes else None,

@@ -60,3 +60,15 @@
 - Tối ưu lô lịch sử: không gọi lại 3 chỉ số khi VN-Index đã có, chỉ checkpoint sau khi lô xong; chạy lại 63 backend test và Ruff/mypy đều qua.
 - Worker giới hạn refresh quote mỗi 5 phút trong phiên, ngoài phiên một lần/ngày và sau đóng cửa; test lịch giao dịch qua. Trang tự lấy snapshot mới mỗi 5 phút khi đang mở và khi quay lại tab, không che bảng đang xem.
 - Sau triển khai Compose, API qua frontend trả 1.516 mã, 930 mã có giá khớp, 1.516 mã có giá tham chiếu trong 232 ms; trang `/market` HTTP 200. Lô lịch sử tiếp theo nhập thêm 16.451 nến/50 mã, 0 lỗi. Full backend suite trong container sau lần build cuối: 63 test qua, coverage 87,91%; migration head qua.
+
+## BE-VN-QUOTE-FIELDS — kiểm tra trường khối lượng
+- [Tài liệu Vnstock 5](https://www.vnstocks.com/docs/vnstock/thi-truong-market) mục 2.3 và 8.1: `Market().quote(symbols)` có 23 cột giá, bid/ask và khối lượng giao dịch của khối ngoại; không có tổng khối lượng hoặc tổng giá trị giao dịch. Không suy ra `volume`/`tradingValue` từ bid/ask hay khối ngoại vì sai ý nghĩa.
+- Không đổi code. Thử kiểm payload trực tiếp bị chặn vì Docker Desktop hiện không chạy (`dockerDesktopLinuxEngine` không tồn tại); cần xác nhận lại schema runtime khi Docker chạy. Bảng giá giữ trống các cột không có dữ liệu.
+- Khảo sát thêm: `Insights().sentiment.heatmap()` là nguồn bulk cho vốn hoá/khối lượng/giá trị theo sàn, nhưng yêu cầu Bronze; Community nhận `EntitlementError`. `Market().equity(s).summary()` chưa được hỗ trợ ở Vnstock 5. Ghi spec/giới hạn vào `docs/decisions.md`, không gọi 1.516 endpoint từng mã và không sửa code khi chưa có nguồn phù hợp.
+
+## BE-VN-NEXT — trang mã và tổng quan nhanh hơn
+- Thêm `/api/v1/market/board/{symbol}` từ snapshot đã lưu; tổng quan dùng cùng snapshot cho số tăng/giảm, mã dẫn đầu và ngành. Không gán khối lượng giao dịch khi KBS không có trường đó.
+- Khi snapshot KBS vắng mặt, bảng giữ 1.516 mã và dùng close VCI của phiên mới nhất đã lưu, gắn `stale`/`vci-eod`; mã chỉ có nến cũ để trống, không suy đoán giá tham chiếu. Cache fallback 60 giây.
+- Trang mã lấy riêng một quote; dashboard cho tin tải độc lập, bỏ request thừa và polling 10 giây. Bản đồ nhiệt dùng top 200 khối lượng EOD và màu theo biên độ thường từng sàn, bỏ nhãn trần/sàn suy đoán.
+- Sau khi Docker mở lại, worker báo thiết bị Vnstock bị vô hiệu hoá; cần chủ tài khoản gỡ thiết bị Docker cũ để worker lấy snapshot KBS mới. Dữ liệu VCI đã lưu vẫn dùng được.
+- Compose cuối: `/market`, `/dashboard`, `/stock/FPT` HTTP 200; bảng có 1.516 mã, 296 mã có nến đúng phiên 06/11, `stale`/`vci-eod`; lượt cache 232 ms. Kiểm tra trực quan cả ba trang. Ruff, mypy, migration và 66 backend test qua (coverage 87,91%); frontend lint, 13 test và build qua.

@@ -168,3 +168,10 @@
 | `/news/intelligence` | Không | `/api/v1/news` |
 | `/ai/explain` | `explainItem` | `/api/v1/ai/explain` |
 | `/ai/chat` | `chatWithAI` | `/api/v1/ai/chat` |
+
+## BE-VN-DATA-FIELDS: phạm vi dữ liệu của Vnstock Community (08/11/2026)
+
+- [Vnstock Market v5](https://www.vnstocks.com/docs/vnstock/thi-truong-market), mục 2.3 và 8.1: `Market().quote(symbols)` lấy nhiều mã trong một truy vấn nhưng không có tổng khối lượng và tổng giá trị giao dịch. `foreign_buy_volume`/`foreign_sell_volume` chỉ là khối ngoại; `bid_vol`/`ask_vol` là lệnh chờ. Không dùng chúng thay `volume`/`tradingValue`.
+- [Vnstock Insights v5](https://www.vnstocks.com/docs/vnstock/thong-ke-insights), mục 3.3: `sentiment.heatmap(exchange=...)` trả từng mã với `market_cap` tính bằng tỷ đồng, `volume_1d` là cổ phiếu, `value_1d` là đồng. Đây là nguồn bulk khả thi cho ba sàn, nhưng yêu cầu cấp Bronze trở lên; key Community nhận `EntitlementError`. Không gọi endpoint này bằng key hiện có.
+- [Vnstock Market v5](https://www.vnstocks.com/docs/vnstock/thi-truong-market), mục 10: `Market().equity(s).summary()` (bản cũ có P/E, P/B) hiện nhận `VNSTOCK_ROUTE_NOT_MIGRATED`. `Insights().screener` cũng chưa có ở v5. Không có endpoint Community bulk đã xác nhận cho P/E/P/B từng mã.
+- Giữ giá, khối lượng và ngày quan sát tách biệt: `price_bars.volume` từ nến ngày VCI có thể hiện như số liệu EOD với `trade_date`, nhưng không được nhập nhằng thành khối lượng trong phiên của quote KBS. Khi có nguồn bulk được cấp quyền, thêm job định kỳ riêng, giữ `source`/`asOf` theo từng trường và kiểm chứng đơn vị bằng payload thật trước khi hiển thị.

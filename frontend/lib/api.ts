@@ -75,6 +75,15 @@ export type Quote = {
   source?: string | null
 }
 
+export type StockBoardQuote = Quote & {
+  name: string | null
+  sector: string | null
+  reference_price: number | null
+  snapshot_at: string | null
+  quote_source: string | null
+  status: 'current' | 'stale' | 'no_data'
+}
+
 export type OHLCVCandle = {
   time: string | null
   open: number | null
@@ -550,6 +559,28 @@ export const getMarketBoard = async (): Promise<MarketBoardResponse> => {
 // ============================================================
 // Stock endpoints
 // ============================================================
+
+export const getStockBoardQuote = async (symbol: string): Promise<StockBoardQuote> => {
+  const response = await get<{
+    item: { symbol: string; name: string | null; exchange: string | null; sector: string | null;
+      price: number | null; referencePrice?: number | null; change: number | null;
+      percentChange: number | null; volume?: number | null; asOf?: string | null }
+    source: string
+    dataMode: 'synthetic-demo' | 'market-provider'
+    quoteSource: string | null
+    snapshotAt: string | null
+    status: 'current' | 'stale' | 'no_data'
+  }>(`/api/v1/market/board/${encodeURIComponent(symbol.toUpperCase())}`)
+  return {
+    symbol: response.item.symbol, name: response.item.name,
+    exchange: response.item.exchange ?? '', sector: response.item.sector,
+    current_price: response.item.price, reference_price: response.item.referencePrice ?? null,
+    price_change: response.item.change, percent_change: response.item.percentChange,
+    volume: response.item.volume ?? null, updated_at: response.snapshotAt ?? response.item.asOf ?? '',
+    data_mode: response.dataMode, source: response.source,
+    snapshot_at: response.snapshotAt, quote_source: response.quoteSource, status: response.status,
+  }
+}
 
 export const getQuote = async (symbol: string): Promise<Quote> => {
   const data = await get<{ symbol: string; exchange: string | null; price: number | null; change: number | null;

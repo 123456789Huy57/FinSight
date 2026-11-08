@@ -299,7 +299,9 @@ export default function MarketPage() {
   })
   const snapshotNote = snapshotAt
     ? `${boardStatus === 'stale' ? 'Ảnh chụp cũ' : 'Bảng giá'} ${quoteSource?.toUpperCase() ?? 'Vnstock'} lấy lúc ${new Date(snapshotAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' })}; có thể trễ.`
-    : undefined
+    : quoteSource === 'vci-eod'
+      ? `Giá cuối ngày VCI${lastUpdated ? ` đến ${new Date(lastUpdated).toLocaleDateString('vi-VN', { timeZone: 'UTC', dateStyle: 'short' })}` : ''}; ảnh chụp bảng giá chưa sẵn sàng.`
+      : undefined
 
   return (
     <>
@@ -381,7 +383,7 @@ export default function MarketPage() {
                 {/* Dải thống kê */}
                 {!loading && (
                   <p className="border-b border-[var(--fs-line)] px-5 py-2.5 text-[13px] text-[var(--fs-muted)]">
-                    <span className="block">Bảng giá: {quotedCount.toLocaleString('vi-VN')} / {stocks.length.toLocaleString('vi-VN')} mã có giá khớp.</span>
+                    <span className="block">{quoteSource === 'vci-eod' ? 'Giá cuối ngày' : 'Bảng giá'}: {quotedCount.toLocaleString('vi-VN')} / {stocks.length.toLocaleString('vi-VN')} mã có giá{quoteSource === 'vci-eod' ? '' : ' khớp'}.</span>
                     {coverage && <span className="block">Lịch sử giá: {coverage.withHistory.toLocaleString('vi-VN')} / {coverage.listed.toLocaleString('vi-VN')} mã đã tải.</span>}
                     Trong {pricedDisplayed.toLocaleString('vi-VN')} mã có giá đang lọc:{' '}
                     <span className="tabular-nums" style={{ color: 'var(--fs-up)' }}>{counts.up} tăng</span>,{' '}

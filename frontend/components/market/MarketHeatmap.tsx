@@ -4,56 +4,25 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { squarify } from '@/lib/treemap';
 import { fmtCompact, fmtPrice } from '@/lib/format';
+import { changeColor, HEATMAP_LEGEND } from '@/lib/heatmap-color';
 
 export type HeatmapItem = {
   symbol: string;
+  exchange: string;
   name?: string;
   sector: string;
   cap: number | null;
-  value: number | null;
+  volume: number | null;
   price: number | null;
   change: number;
 };
 
-const HOSE_LIMIT = 6.9;
-
-type Mode = 'cap' | 'value';
+type Mode = 'cap' | 'volume';
 
 const MODES: { id: Mode; label: string }[] = [
   { id: 'cap', label: 'Vốn hoá' },
-  { id: 'value', label: 'GTGD' },
+  { id: 'volume', label: 'Khối lượng' },
 ];
-
-// ---- Màu theo % thay đổi (kiểu bảng điện Việt Nam) ----
-const CEILING = '#a24bd6';
-const FLOOR = '#1ba9c4';
-const UNCHANGED = '#6a5d22';
-const UP_STOPS = ['#34514a', '#2c6b4e', '#23894f', '#18a957'];
-const DOWN_STOPS = ['#5e3a43', '#823a46', '#a8353f', '#df2f37'];
-
-function hexToRgb(h: string) {
-  const n = parseInt(h.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-function mix(a: string, b: string, t: number) {
-  const A = hexToRgb(a);
-  const B = hexToRgb(b);
-  const c = A.map((v, i) => Math.round(v + (B[i] - v) * t));
-  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
-}
-function ramp(stops: string[], t: number) {
-  const x = Math.min(Math.max(t, 0), 1) * (stops.length - 1);
-  const i = Math.min(Math.floor(x), stops.length - 2);
-  return mix(stops[i], stops[i + 1], x - i);
-}
-
-export function changeColor(change: number) {
-  if (change >= HOSE_LIMIT) return CEILING;
-  if (change <= -HOSE_LIMIT) return FLOOR;
-  if (Math.abs(change) < 0.005) return UNCHANGED;
-  const t = Math.min(Math.abs(change) / 4, 1);
-  return change > 0 ? ramp(UP_STOPS, t) : ramp(DOWN_STOPS, t);
-}
 
 function fmtPct(n: number) {
   const s = n.toFixed(2);
@@ -125,9 +94,9 @@ export function MarketHeatmap({
 }: Props) {
   const router = useRouter();
   const hasCap = useMemo(() => data.some((s) => weightOf(s, 'cap') > 0), [data]);
-  const modes = hasCap ? MODES : MODES.filter((m) => m.id === 'value');
+  const modes = hasCap ? MODES : MODES.filter((m) => m.id === 'volume');
   const [picked, setPicked] = useState<Mode>('cap');
-  const mode: Mode = hasCap ? picked : 'value';
+  const mode: Mode = hasCap ? picked : 'volume';
   const setMode = setPicked;
   const [ref, size] = useSize<HTMLDivElement>();
   const [hover, setHover] = useState<{ s: HeatmapItem; x: number; y: number } | null>(null);
@@ -216,7 +185,7 @@ export function MarketHeatmap({
                     top: t.y + 0.5,
                     width: Math.max(t.w - 1, 0),
                     height: Math.max(t.h - 1, 0),
-                    background: changeColor(s.change),
+                    background: changeColor(s.change, s.exchange),
                   }}
                   onMouseMove={(e) => {
                     const box = (e.currentTarget.offsetParent as HTMLElement).getBoundingClientRect();
@@ -250,19 +219,16 @@ export function MarketHeatmap({
       {/* Legend */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4 sm:px-5">
         <div className="flex flex-wrap items-center gap-3 text-[12px] text-white/55">
-          <span className="tabular-nums">−4%</span>
-          <div className="flex gap-[3px]">
-            {[-4, -2.5, -1.2, -0.3, 0, 0.3, 1.2, 2.5, 4].map((v) => (
-              <span key={v} className="h-3 w-5 rounded-[2px] sm:w-6" style={{ background: changeColor(v) }} />
-            ))}
-          </div>
-          <span className="tabular-nums">+4%</span>
-          <span className="ml-1 flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded-[2px]" style={{ background: CEILING }} /> Trần
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-[2px]" style={{ background: HEATMAP_LEGEND.down }} /> Giảm
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded-[2px]" style={{ background: FLOOR }} /> Sàn
+            <span className="h-3 w-3 rounded-[2px]" style={{ background: HEATMAP_LEGEND.flat }} /> Đứng
           </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-[2px]" style={{ background: HEATMAP_LEGEND.up }} /> Tăng
+          </span>
+          <span>Độ đậm theo biên độ thường: HOSE ±7%, HNX ±10%, UPCOM ±15%. Ngày đặc biệt có thể khác.</span>
         </div>
         {note && <div className="ml-auto text-[12px] text-white/50">{note}</div>}
       </div>
@@ -297,8 +263,8 @@ function Tooltip({ s, x, y, width, height }: { s: HeatmapItem; x: number; y: num
         <dd className="text-right tabular-nums">{fmtPrice(s.price)}</dd>
         <dt className="text-[#898683]">Vốn hoá</dt>
         <dd className="text-right tabular-nums">{fmtCompact(s.cap)}</dd>
-        <dt className="text-[#898683]">GTGD</dt>
-        <dd className="text-right tabular-nums">{fmtCompact(s.value)}</dd>
+        <dt className="text-[#898683]">KL EOD</dt>
+        <dd className="text-right tabular-nums">{fmtCompact(s.volume)}</dd>
       </dl>
     </div>
   );

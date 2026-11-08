@@ -18,7 +18,6 @@ import { useMarketPolling } from '@/lib/useMarketPolling'
 
 import {
   getMarketIndices,
-  getMostActive,
   getMarketCommentary,
   getNewsIntelligence,
 } from '@/lib/api'
@@ -27,19 +26,10 @@ import type {
   MarketMover,
   MarketBreadth,
   SectorPerformanceResponse,
-  MostActiveResponse,
   MarketCommentaryResponse,
   NewsItem,
   AIExplainRequest,
 } from '@/lib/api'
-
-const DEMO_LOSERS: MarketMover[] = [
-  { symbol: 'HNG', exchange: 'HOSE', current_price: 8800,  price_change: -400,  percent_change: -4.35, volume: 2450000 },
-  { symbol: 'PDR', exchange: 'HOSE', current_price: 22100, price_change: -700,  percent_change: -3.07, volume: 1450000 },
-  { symbol: 'DXG', exchange: 'HOSE', current_price: 17150, price_change: -450,  percent_change: -2.56, volume: 5123000 },
-  { symbol: 'VCI', exchange: 'HOSE', current_price: 48700, price_change: -1100, percent_change: -2.21, volume: 2890000 },
-  { symbol: 'HCM', exchange: 'HOSE', current_price: 31400, price_change: -650,  percent_change: -2.03, volume: 1765000 },
-]
 
 // ─── Page ──────────────────────────────────────────────────────
 
@@ -49,7 +39,6 @@ export default function DashboardPage() {
   const [losers,     setLosers]     = useState<MarketMover[]>([])
   const [breadth,    setBreadth]    = useState<MarketBreadth | null>(null)
   const [sectors,    setSectors]    = useState<SectorPerformanceResponse | null>(null)
-  const [mostActive, setMostActive] = useState<MostActiveResponse | null>(null)
   const [commentary, setCommentary] = useState<MarketCommentaryResponse | null>(null)
   const [news,       setNews]       = useState<NewsItem[]>([])
 
@@ -88,11 +77,16 @@ export default function DashboardPage() {
       setLoadingCommentary(true)
       setLoadingNews(true)
     }
+    const newsTask = getNewsIntelligence()
+      .then((result) => setNews(result?.items ?? []))
+      .catch(() => setNews([]))
+      .finally(() => {
+        if (!silent) setLoadingNews(false)
+      })
     try {
-      const [idxRes, commentaryRes, actRes] = await Promise.allSettled([
+      const [idxRes, commentaryRes] = await Promise.allSettled([
         getMarketIndices(),
         getMarketCommentary(),
-        getMostActive(),
       ])
 
       if (idxRes.status === 'fulfilled' && idxRes.value?.indices?.length)
@@ -115,20 +109,9 @@ export default function DashboardPage() {
         }
       }
 
-      if (actRes.status === 'fulfilled' && actRes.value)
-        setMostActive(actRes.value)
-
-      try {
-        const newsRes = await getNewsIntelligence()
-        if (newsRes?.items?.length) setNews(newsRes.items)
-      } catch {
-        setNews([])
-      }
-
       const timestamps = [
         idxRes.status === 'fulfilled' ? idxRes.value.timestamp : null,
         commentaryRes.status === 'fulfilled' ? commentaryRes.value?.updated_at : null,
-        actRes.status === 'fulfilled' ? actRes.value?.updated_at : null,
       ].filter((value): value is string => Boolean(value))
       const parsed = timestamps
         .map((value) => ({ value, time: new Date(value).getTime() }))
@@ -138,16 +121,16 @@ export default function DashboardPage() {
       if (!silent) {
         setLoadingMain(false)
         setLoadingCommentary(false)
-        setLoadingNews(false)
       }
     }
+    await newsTask
   }, [])
 
   useEffect(() => {
     void fetchMain()
   }, [fetchMain])
 
-  const marketStatus = useMarketPolling(() => fetchMain(true), 10_000)
+  const marketStatus = useMarketPolling(() => fetchMain(true), 5 * 60_000)
 
   return (
     <>
@@ -207,7 +190,6 @@ export default function DashboardPage() {
               <MoversPanel
                 gainers={gainers}
                 losers={losers}
-                mostActive={mostActive?.stocks}
                 loading={loadingMain}
                 onExplain={handleExplain}
               />

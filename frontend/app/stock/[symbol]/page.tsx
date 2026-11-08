@@ -11,8 +11,8 @@ import { ExplainButton } from '@/components/shared/ExplainButton'
 import { ChatWidget } from '@/components/ai/ChatWidget'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { Panel, DataNote, Change, Segmented } from '@/components/fs'
-import { getNewsIntelligence, getQuote, getStockHistory, getStockIndicators, getStockProfile } from '@/lib/api'
-import type { NewsItem, Quote, OHLCVCandle, StockIndicators, StockProfile, AIExplainRequest } from '@/lib/api'
+import { getNewsIntelligence, getStockBoardQuote, getStockHistory, getStockIndicators, getStockProfile } from '@/lib/api'
+import type { NewsItem, StockBoardQuote, OHLCVCandle, StockIndicators, StockProfile, AIExplainRequest } from '@/lib/api'
 import { useMarketPolling } from '@/lib/useMarketPolling'
 import { accountFetch, ACCESS_TOKEN_KEY } from '@/lib/account'
 import { fmtCompact, fmtPrice as fmtPriceVi, formatDataAsOf } from '@/lib/format'
@@ -95,7 +95,7 @@ export default function StockPage({ params }: Props) {
   const { symbol } = use(params)
   const SYM = symbol.toUpperCase()
 
-  const [quote,        setQuote]        = useState<Quote | null>(null)
+  const [quote,        setQuote]        = useState<StockBoardQuote | null>(null)
   const [profile,      setProfile]      = useState<StockProfile | null>(null)
   const [candles,      setCandles]      = useState<OHLCVCandle[]>([])
   const [indicators,   setIndicators]   = useState<StockIndicators | null>(null)
@@ -192,12 +192,20 @@ export default function StockPage({ params }: Props) {
     })
   }, [SYM, quote, profile, handleExplain])
 
-  const fetchQuote = useCallback(async () => {
-    setLoadingQuote(true)
-    setQuoteError(null)
-    try { setQuote(await getQuote(SYM)) }
-    catch { setQuote(null); setQuoteError(`Không tải được dữ liệu cho mã ${SYM}. Kiểm tra mã hoặc kết nối API.`) }
-    finally { setLoadingQuote(false) }
+  const fetchQuote = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoadingQuote(true)
+      setQuoteError(null)
+    }
+    try { setQuote(await getStockBoardQuote(SYM)) }
+    catch {
+      if (silent) setQuote((previous) => previous ? { ...previous, status: 'stale' } : previous)
+      else {
+        setQuote(null)
+        setQuoteError(`Không tải được dữ liệu cho mã ${SYM}. Kiểm tra mã hoặc kết nối API.`)
+      }
+    }
+    finally { if (!silent) setLoadingQuote(false) }
   }, [SYM])
 
   const fetchChart = useCallback(async () => {
@@ -255,7 +263,7 @@ export default function StockPage({ params }: Props) {
     })
   }, [candles, newsItems, SYM])
 
-  useMarketPolling(fetchQuote, 10_000)
+  useMarketPolling(() => fetchQuote(true), 5 * 60_000)
 
   const loading = loadingQuote
 
@@ -267,7 +275,7 @@ export default function StockPage({ params }: Props) {
   })()
 
   const exchange = quote?.exchange ?? profile?.exchange ?? null
-  const sector = profile?.sector ?? profile?.industry ?? null
+  const sector = profile?.sector ?? profile?.industry ?? quote?.sector ?? null
   const identityLine = [exchange ? `Sàn ${exchange}` : null, sector ? `ngành ${sector}` : null].filter(Boolean).join(', ')
   const shownNews = newsItems.slice(0, 5)
   const techRows = indicators?.indicators ? technicalRows(indicators.indicators, indicators.lastPrice ?? quote?.current_price ?? null) : []
@@ -292,7 +300,7 @@ export default function StockPage({ params }: Props) {
         <header className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-[var(--fs-line)] bg-white p-5">
           <div className="min-w-0 space-y-1">
             <h1 className="text-[32px] font-medium leading-none tracking-[-0.025em]">{SYM}</h1>
-            {profile?.company_name && <p className="text-[15px] text-[var(--fs-ink-2)]">{profile.company_name}</p>}
+            {(profile?.company_name ?? quote?.name) && <p className="text-[15px] text-[var(--fs-ink-2)]">{profile?.company_name ?? quote?.name}</p>}
             {identityLine && <p className="text-[13px] text-[var(--fs-muted)]">{identityLine}</p>}
 
             {loading ? (
@@ -309,11 +317,19 @@ export default function StockPage({ params }: Props) {
                 </div>
               </div>
             ) : (
-              <p className="pt-3 text-[14px] text-[var(--fs-muted)]">Không tải được dữ liệu</p>
+              <p className="pt-3 text-[14px] text-[var(--fs-muted)]">{quote ? 'Chưa có giá khớp' : 'Không tải được dữ liệu'}</p>
             )}
 
             <div className="space-y-0.5 pt-2">
-              {quote && <DataNote dataMode={quote.data_mode} asOf={quote.updated_at} source={quote.source} />}
+              {quote?.source === 'vnstock' ? (
+                <p className="text-[13px] text-[var(--fs-muted)]">
+                  {quote.snapshot_at
+                    ? `${quote.status === 'stale' ? 'Ảnh chụp cũ' : 'Bảng giá'} ${quote.quote_source?.toUpperCase() ?? 'Vnstock'} lấy lúc ${new Date(quote.snapshot_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' })}; có thể trễ.`
+                    : quote.quote_source === 'vci-eod'
+                      ? `Giá cuối ngày VCI đến ${formatDataAsOf(quote.updated_at)}; ảnh chụp bảng giá chưa sẵn sàng.`
+                      : 'Chưa có ảnh chụp bảng giá.'}
+                </p>
+              ) : quote && <DataNote dataMode={quote.data_mode} asOf={quote.updated_at} source={quote.source} />}
               {profile?.as_of && (
                 <div className="flex gap-1 text-[13px] text-[var(--fs-muted)]">
                   <span>Hồ sơ:</span>
@@ -403,7 +419,8 @@ export default function StockPage({ params }: Props) {
                   </div>
                 ) : quote ? (
                   <dl>
-                    <Row label="Giá hiện tại">{valueOrNoData(quote.current_price, (n) => fmtPriceVi(n, 0))}</Row>
+                    <Row label={quote.quote_source === 'vci-eod' ? 'Giá cuối ngày' : quote.quote_source ? 'Giá khớp' : 'Giá hiện tại'}>{valueOrNoData(quote.current_price, (n) => fmtPriceVi(n, 0))}</Row>
+                    {quote.reference_price != null && <Row label="Giá tham chiếu">{fmtPriceVi(quote.reference_price, 0)}</Row>}
                     <Row label="Thay đổi">{valueOrNoData(quote.price_change, (n) => fmtPriceVi(n, 0))}</Row>
                     <Row label="Biến động"><Change value={quote.percent_change} /></Row>
                     <Row label="Khối lượng">{valueOrNoData(quote.volume, (n) => fmtVol(n))}</Row>
