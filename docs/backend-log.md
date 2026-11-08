@@ -104,3 +104,9 @@
 - Build image production với `INSTALL_VNSTOCK=true` thành công; `.dockerignore` loại `.env`, dependency và build output. `docker compose config --quiet` qua.
 - Kiểm tra: Ruff, mypy, 73 backend test với coverage domain 87,91%, frontend lint, 13 test, build đều qua. Docker Compose smoke test: `/ready`, API data-status, `/`, `/market` đều HTTP 200; worker đồng bộ 1.516 mã.
 - API local báo `source=vnstock`, `dataMode=market-provider`, trạng thái `stale`; coverage tại lần kiểm tra là 1.121 mã có lịch sử và 715 mã tới ngày chỉ số. Chưa deploy Render hoặc push branch.
+
+## FREE-DAILY-SYNC — hướng miễn phí
+- Thêm `backend/scripts/daily_sync.py`: mỗi lần chạy đồng bộ danh mục, bảng giá, RSS, một lô lịch sử 50 mã và event study rồi thoát; không cần worker chạy liên tục hoặc persistent disk.
+- Thêm workflow GitHub Actions chạy 16:30 giờ Việt Nam ngày làm việc; secrets chỉ nằm trong GitHub Actions. Thêm `render-free.yaml` cho web Render Free dùng PostgreSQL ngoài (Supabase/Neon).
+- Giới hạn được ghi rõ: web có thể sleep, workflow có thể trễ, lịch sử backfill theo lô 50 mã/ngày; dữ liệu hiển thị `asOf`/`stale`, không gọi là realtime.
+- Cache định danh Vnstock được thêm vào workflow để hạn chế đăng ký thiết bị mới mỗi lần GitHub Actions tạo runner.

@@ -137,6 +137,18 @@ Truy cập http://localhost:3000.
 
 Trước khi provision môi trường công khai, xem [production operations readiness](docs/production-operations.md) về secret hygiene, backup/restore và monitoring.
 
+### Deploy miễn phí, cập nhật một lần mỗi ngày
+
+Dùng [render-free.yaml](render-free.yaml) cho web, PostgreSQL Free của Supabase
+hoặc Neon, và workflow [daily-market-sync.yml](.github/workflows/daily-market-sync.yml)
+để cập nhật dữ liệu vào khoảng 16:30 giờ Việt Nam từ thứ Hai đến thứ Sáu.
+Tạo GitHub Actions secrets `MARKET_DATABASE_URL`, `MARKET_JWT_SECRET` và
+`VNSTOCK_API_KEY`; không đặt key Vnstock trên web Render. Gói miễn phí có thể
+ngủ, workflow có thể chạy trễ, và mỗi lần chỉ tải một lô lịch sử 50 mã.
+Website hiển thị `asOf`/`stale`; đây là dữ liệu cuối ngày, không phải realtime.
+Xem [hướng dẫn triển khai miễn phí](docs/FREE_DAILY_DEPLOYMENT.md) để tạo
+database, secrets và chạy lần đồng bộ đầu tiên.
+
 ---
 
 ## Cấu trúc dự án
