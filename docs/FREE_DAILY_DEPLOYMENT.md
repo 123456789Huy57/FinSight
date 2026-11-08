@@ -32,8 +32,8 @@ lại thiết bị; GitHub Actions vẫn có thể thay runner hoặc làm cache
 
 ## Deploy web
 
-Trong Render chọn New > Blueprint, chọn branch `main`, rồi chọn file
-`render-free.yaml`. Khi được hỏi `DATABASE_URL`, nhập cùng database URL nhưng
+Trong Render chọn New > Blueprint, chọn branch `main`; Render sẽ tự đọc file
+`render.yaml`. Khi được hỏi `DATABASE_URL`, nhập cùng database URL nhưng
 chỉ ở biến môi trường Render. Đặt `CORS_ORIGINS` bằng đúng URL `onrender.com`.
 
 Blueprint này không tạo worker, Redis hay persistent disk trả phí. Web Free có

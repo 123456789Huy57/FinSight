@@ -1,88 +1,28 @@
-databases:
-  - name: finsight-db
-    databaseName: finsight
-    user: finsight
-    postgresMajorVersion: "16"
-
 services:
   - type: web
-    name: finsight
+    name: finsight-free
     runtime: docker
     dockerfilePath: ./Dockerfile
+    plan: free
     healthCheckPath: /ready
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: MARKET_PROVIDER
         value: vnstock
-      - key: PROVIDER_RPM
-        value: "60"
-      - key: CORS_ORIGINS
-        sync: false
       - key: NEWS_FEED_ENABLED
         value: "true"
       - key: RUN_SNAPSHOT_JOBS
         value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        value: ""
+      - key: CORS_ORIGINS
+        sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: DATABASE_URL
-        fromDatabase:
-          name: finsight-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: finsight-cache
-          type: keyvalue
-          property: connectionString
       - key: OPENROUTER_API_KEY
         sync: false
       - key: OPENROUTER_MODEL
         value: deepseek/deepseek-chat-v3.1
-
-  - type: worker
-    name: finsight-worker
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerCommand: python3 /app/backend/worker.py
-    plan: 0.5c-512mb
-    disk:
-      name: vnstock-auth
-      mountPath: /data/vnstock
-      sizeGB: 1
-    envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: MARKET_PROVIDER
-        value: vnstock
-      - key: INSTALL_VNSTOCK
-        value: "true"
-      - key: VNSTOCK_HOME
-        value: /data/vnstock
-      - key: VNSTOCK_API_KEY
-        sync: false
-      - key: VNSTOCK_SYMBOLS
-        value: ALL
-      - key: VNSTOCK_REQUEST_DELAY_SECONDS
-        value: "6"
-      - key: PROVIDER_RPM
-        value: "60"
-      - key: CORS_ORIGINS
-        sync: false
-      - key: NEWS_FEED_ENABLED
-        value: "true"
-      - key: RUN_SNAPSHOT_JOBS
-        value: "false"
-      - key: DATABASE_URL
-        fromDatabase:
-          name: finsight-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: finsight-cache
-          type: keyvalue
-          property: connectionString
-
-  - type: keyvalue
-    name: finsight-cache
-    plan: free
-    maxmemoryPolicy: allkeys-lru

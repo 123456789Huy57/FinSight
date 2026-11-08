@@ -139,7 +139,7 @@ Trước khi provision môi trường công khai, xem [production operations rea
 
 ### Deploy miễn phí, cập nhật một lần mỗi ngày
 
-Dùng [render-free.yaml](render-free.yaml) cho web, PostgreSQL Free của Supabase
+Dùng [render.yaml](render.yaml) cho web, PostgreSQL Free của Supabase
 hoặc Neon, và workflow [daily-market-sync.yml](.github/workflows/daily-market-sync.yml)
 để cập nhật dữ liệu vào khoảng 16:30 giờ Việt Nam từ thứ Hai đến thứ Sáu.
 Tạo GitHub Actions secrets `MARKET_DATABASE_URL`, `MARKET_JWT_SECRET` và
