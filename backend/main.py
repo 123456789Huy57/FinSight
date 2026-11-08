@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -66,6 +67,11 @@ app.add_middleware(
 app.add_middleware(BodySizeLimitMiddleware)
 
 logger = logging.getLogger("finsight.api")
+REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+
+
+def safe_request_id(supplied_id: str | None) -> str:
+    return supplied_id if supplied_id and REQUEST_ID_PATTERN.fullmatch(supplied_id) else str(uuid.uuid4())
 
 
 class JsonLogFormatter(logging.Formatter):
@@ -91,7 +97,7 @@ if not logger.handlers:
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
-    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    request_id = safe_request_id(request.headers.get("x-request-id"))
     request.state.request_id = request_id
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id

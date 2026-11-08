@@ -13,7 +13,7 @@ Ngày rà soát: 07/11/2026. Phạm vi: xác thực, cấu hình, CORS, proxy AP
 
 1. **Refresh chưa có giới hạn tần suất.** `backend/api/v1/auth.py:138-147`. Request thiếu/sai cookie vẫn làm việc lặp lại ở endpoint này; thêm giới hạn theo client ở `/refresh` và `/logout` để giảm tải, đồng thời theo dõi 401/429.
 2. **Đăng ký tiết lộ email đã tồn tại.** `backend/api/v1/auth.py:102-112`. Trả 409 khác với email mới, cho phép dò tài khoản; cân nhắc phản hồi đồng nhất nếu sản phẩm không cần báo trùng email trực tiếp.
-3. **Request ID do client tự đặt được ghi và phản hồi nguyên trạng.** `backend/main.py:91-97`. Giới hạn độ dài và ký tự hợp lệ trước khi đưa vào log/header để tránh giá trị bất thường làm nhiễu quan sát.
+3. **Request ID do client tự đặt được ghi và phản hồi nguyên trạng.** `backend/main.py:91-97`. Đã xử lý: chỉ nhận chuỗi tối đa 128 ký tự gồm chữ, số, `.`, `_`, `-`; giá trị khác được thay bằng UUID trước khi ghi log và phản hồi.
 
 ## Các kiểm tra đã đạt
 
