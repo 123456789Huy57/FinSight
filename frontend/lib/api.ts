@@ -11,6 +11,11 @@ export type MarketDataStatus = {
   stale: boolean
   priceAsOf: string | null
   indexAsOf: string | null
+  symbolCoverage?: {
+    listed: number
+    withHistory: number
+    currentToIndexDate: number
+  }
   lastRun: {
     status: 'running' | 'success' | 'partial' | 'failed'
     startedAt: string
@@ -505,6 +510,19 @@ export const getScreenerData = async (options: ScreenerOptions = {}): Promise<Sc
       fundamental_source: item.fundamentalSource ?? undefined,
     })),
   }
+}
+
+export const getScreenerUniverse = async (q?: string): Promise<ScreenerResponse> => {
+  const options: ScreenerOptions = { q, sort: 'symbol', limit: 200 }
+  const first = await getScreenerData(options)
+  const pages: ScreenerResponse[] = [first]
+  for (let offset = 200; offset < first.count; offset += 800) {
+    const offsets = Array.from({ length: Math.min(4, Math.ceil((first.count - offset) / 200)) }, (_, i) => offset + i * 200)
+    pages.push(...await Promise.all(offsets.map((pageOffset) => getScreenerData({ ...options, offset: pageOffset }))))
+  }
+  const stocks = Array.from(new Map(pages.flatMap((page) => page.stocks.map((stock) => [stock.symbol, stock]))).values())
+  const updated_at = pages.reduce((latest, page) => page.updated_at > latest ? page.updated_at : latest, '')
+  return { ...first, updated_at, stocks }
 }
 
 // ============================================================

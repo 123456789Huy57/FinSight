@@ -51,3 +51,4 @@
 - `VNSTOCK_SYMBOLS=ALL`: nhập 1.516 mã HOSE/HNX/UPCOM, bỏ 239 mã DELISTED; lưu checkpoint theo lô 50 mã.
 - Sau khi khôi phục thiết bị Docker Vnstock, lô đầu nhập 50 mã/20.771 nến, không lỗi; các lô sau chạy nền, có ngưỡng giữ lại 20% quota.
 - Migration 0009 upgrade → downgrade → upgrade qua trên database tạm; `mypy domain` và Ruff qua. T+1/T+5 chưa thể có ba tin `measured`: RSS hiện chỉ có tin 06–08/11, chưa đủ cửa sổ T+5.
+- Bảng giá lấy tất cả trang API theo thứ tự mã, cho xem thêm từng 100 dòng và hiện số mã đã có giá trên 1.516 mã niêm yết. Kiểm tra Compose: 163 mã đã có giá; nút Xem thêm hiển thị đủ 163 dòng. Frontend lint (1 warning cũ), 12 test và build qua.

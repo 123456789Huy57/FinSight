@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Search } from 'lucide-react'
 
@@ -9,7 +9,7 @@ import { ExplainPanel } from '@/components/ai/ExplainPanel'
 import { ChatWidget } from '@/components/ai/ChatWidget'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { Panel, PageHeader, Change, Segmented, EmptyState } from '@/components/fs'
-import { getScreenerData, getMarketCommentary } from '@/lib/api'
+import { getScreenerUniverse, getMarketCommentary, getMarketDataStatus } from '@/lib/api'
 import { fmtPrice, fmtCompact } from '@/lib/format'
 import type {
   ScreenerStock,
@@ -117,6 +117,9 @@ export default function MarketPage() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [syntheticData, setSyntheticData] = useState(false)
   const [dataSource, setDataSource] = useState<string | null>(null)
+  const [coverage, setCoverage] = useState<{ listed: number; withHistory: number } | null>(null)
+  const [visibleCount, setVisibleCount] = useState(100)
+  const requestId = useRef(0)
 
   const [explainOpen, setExplainOpen] = useState(false)
   const [explainReq,  setExplainReq]  = useState<AIExplainRequest | null>(null)
@@ -162,20 +165,26 @@ export default function MarketPage() {
   }, [filtersReady, symbolQuery, exchange, sector, changeFilter, sortKey, sortDir])
 
   const fetchData = useCallback(async () => {
+    const currentRequest = ++requestId.current
     setLoading(true)
     setError(null)
     try {
-      const [screenerRes, commentaryRes] = await Promise.allSettled([
-        getScreenerData({ q: symbolQuery.trim() || undefined, limit: 200 }),
+      const [screenerRes, commentaryRes, statusRes] = await Promise.allSettled([
+        getScreenerUniverse(symbolQuery.trim() || undefined),
         getMarketCommentary(),
+        getMarketDataStatus(),
       ])
+      if (currentRequest !== requestId.current) return
       if (screenerRes.status === 'fulfilled') {
         setStocks(screenerRes.value.stocks)
+        setVisibleCount(100)
         setSyntheticData(screenerRes.value.data_mode === 'synthetic-demo')
         setDataSource(screenerRes.value.source ?? null)
       } else {
         setError('Không tải được dữ liệu thị trường. Vui lòng thử lại.')
       }
+      if (statusRes.status === 'fulfilled' && statusRes.value.symbolCoverage)
+        setCoverage(statusRes.value.symbolCoverage)
       if (commentaryRes.status === 'fulfilled' && commentaryRes.value) {
         const d = commentaryRes.value
         if (d.breadth) setBreadth(d.breadth)
@@ -191,7 +200,7 @@ export default function MarketPage() {
         if (!Number.isNaN(dataDate.getTime())) setLastUpdated(screenerRes.value.updated_at)
       }
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
   }, [symbolQuery])
 
@@ -252,6 +261,7 @@ export default function MarketPage() {
   }, [displayed])
 
   const filtersActive = exchange !== 'Tất cả' || sector !== 'Tất cả' || changeFilter !== 'all' || symbolQuery.trim() !== ''
+  const visibleStocks = displayed.slice(0, visibleCount)
 
   return (
     <>
@@ -286,7 +296,7 @@ export default function MarketPage() {
             <div className="min-w-0 xl:col-span-3">
               <Panel
                 title="Danh sách cổ phiếu"
-                aside={!loading ? <span className="tabular-nums">{displayed.length}/{stocks.length} mã</span> : undefined}
+                aside={!loading ? <span className="tabular-nums">{displayed.length} mã đang lọc</span> : undefined}
               >
                 {/* Thanh lọc */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-3 border-b border-[var(--fs-line)] px-5 py-3">
@@ -328,6 +338,7 @@ export default function MarketPage() {
                 {/* Dải thống kê */}
                 {!loading && (
                   <p className="border-b border-[var(--fs-line)] px-5 py-2.5 text-[13px] text-[var(--fs-muted)]">
+                    {coverage && <span className="block">Đã có giá cho {coverage.withHistory.toLocaleString('vi-VN')} / {coverage.listed.toLocaleString('vi-VN')} mã niêm yết.</span>}
                     Trong {displayed.length} mã đang lọc:{' '}
                     <span className="tabular-nums" style={{ color: 'var(--fs-up)' }}>{counts.up} tăng</span>,{' '}
                     <span className="tabular-nums" style={{ color: 'var(--fs-flat)' }}>{counts.flat} đứng</span>,{' '}
@@ -368,7 +379,7 @@ export default function MarketPage() {
                       {loading ? (
                         <ScreenerSkeleton />
                       ) : (
-                        displayed.map((stock) => (
+                        visibleStocks.map((stock) => (
                           <tr key={stock.symbol} className="border-b border-[var(--fs-line)] last:border-0 hover:bg-[var(--fs-surface)]">
                             <td className="px-3 py-2.5 pl-5">
                               <Link href={`/stock/${stock.symbol}`} className="font-medium">{stock.symbol}</Link>
@@ -387,6 +398,13 @@ export default function MarketPage() {
                       )}
                     </tbody>
                   </table>
+                )}
+                {!loading && visibleCount < displayed.length && (
+                  <div className="border-t border-[var(--fs-line)] px-5 py-3 text-center">
+                    <button type="button" onClick={() => setVisibleCount((count) => count + 100)} className="rounded-lg border border-[var(--fs-line)] px-4 py-2 text-[13px] font-medium hover:bg-[var(--fs-surface)]">
+                      Xem thêm mã ({visibleStocks.length}/{displayed.length})
+                    </button>
+                  </div>
                 )}
               </Panel>
             </div>
