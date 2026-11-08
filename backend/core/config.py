@@ -32,7 +32,11 @@ class Settings(BaseSettings):
 
         parts = urlsplit(value)
         query = parse_qsl(parts.query, keep_blank_values=True)
-        query = [("ssl" if key == "sslmode" else key, val) for key, val in query]
+        query = [
+            ("ssl", val) if key == "sslmode" else (key, val)
+            for key, val in query
+            if key != "channel_binding"
+        ]
         return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
     @model_validator(mode="after")
