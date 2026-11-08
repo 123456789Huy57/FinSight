@@ -21,6 +21,7 @@ from jobs.ingest_prices import ingest_price_history
 from jobs.ingest_news import ingest_news
 from jobs.ingest_symbols import ingest_symbols
 from jobs.compute_event_studies import compute_news_event_studies
+from jobs.sync_universe import sync_universe_batch
 from providers.factory import get_configured_market_source_id
 
 
@@ -34,7 +35,8 @@ async def _initial_sync() -> None:
     except Exception as exc:
         print(f"Symbol directory synchronization failed: {exc}", flush=True)
 
-    await _sync_history_if_empty()
+    if settings.market_provider.lower() != "vnstock" or settings.vnstock_symbols.strip().upper() != "ALL":
+        await _sync_history_if_empty()
 
 
 async def _sync_history_if_empty() -> None:
@@ -65,11 +67,24 @@ async def _run_news_ingestion() -> None:
 async def _run_eod_ingestion() -> None:
     today = datetime.now(VN_TZ).date()
     try:
-        result = await ingest_price_history(today - timedelta(days=3), today)
+        # The full-universe job fetches equities in restartable batches. This
+        # small EOD call advances the index date used as its refresh target.
+        symbols = ["FPT"] if settings.market_provider.lower() == "vnstock" and settings.vnstock_symbols.strip().upper() == "ALL" else None
+        result = await ingest_price_history(today - timedelta(days=3), today, symbols=symbols)
         study_result = await compute_news_event_studies()
         print(f"[{datetime.now(VN_TZ).isoformat()}] EOD ingestion complete: {result}; event studies: {study_result}", flush=True)
     except Exception as exc:
         print(f"[{datetime.now(VN_TZ).isoformat()}] EOD ingestion failed: {exc}", flush=True)
+
+
+async def _run_universe_sync() -> None:
+    try:
+        result = await sync_universe_batch()
+        if result["attempted"]:
+            study_result = await compute_news_event_studies()
+            print(f"[{datetime.now(VN_TZ).isoformat()}] Universe history batch: {result}; event studies: {study_result}", flush=True)
+    except Exception as exc:
+        print(f"[{datetime.now(VN_TZ).isoformat()}] Universe history batch failed: {exc}", flush=True)
 
 
 async def main() -> None:
@@ -84,6 +99,10 @@ async def main() -> None:
                       id="daily-prices", max_instances=1, coalesce=True, misfire_grace_time=3600)
     scheduler.add_job(_initial_sync, IntervalTrigger(hours=1), id="initial-history-retry",
                       max_instances=1, coalesce=True, misfire_grace_time=3600)
+    if settings.market_provider.lower() == "vnstock" and settings.vnstock_symbols.strip().upper() == "ALL":
+        scheduler.add_job(_run_universe_sync, IntervalTrigger(minutes=1), id="universe-history",
+                          max_instances=1, coalesce=True, misfire_grace_time=300,
+                          next_run_time=datetime.now(VN_TZ))
     scheduler.start()
     print("FinSight worker scheduled in Asia/Ho_Chi_Minh", flush=True)
     try:

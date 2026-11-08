@@ -15,6 +15,10 @@ services:
         value: production
       - key: MARKET_PROVIDER
         value: csv
+      - key: PROVIDER_RPM
+        value: "60"
+      - key: CORS_ORIGINS
+        sync: false
       - key: NEWS_FEED_ENABLED
         value: "true"
       - key: RUN_SNAPSHOT_JOBS
@@ -45,6 +49,10 @@ services:
         value: production
       - key: MARKET_PROVIDER
         value: csv
+      - key: PROVIDER_RPM
+        value: "60"
+      - key: CORS_ORIGINS
+        sync: false
       - key: NEWS_FEED_ENABLED
         value: "true"
       - key: RUN_SNAPSHOT_JOBS

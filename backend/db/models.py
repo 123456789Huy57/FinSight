@@ -94,6 +94,15 @@ class ProviderJobRun(Base):
     error: Mapped[str | None] = mapped_column(Text)
 
 
+class UniverseSyncAttempt(Base):
+    __tablename__ = "universe_sync_attempts"
+
+    source: Mapped[str] = mapped_column(String(32), primary_key=True)
+    symbol: Mapped[str] = mapped_column(ForeignKey("symbols.symbol", ondelete="CASCADE"), primary_key=True)
+    target_trade_date: Mapped[date] = mapped_column(Date, nullable=False)
+    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class NewsArticle(CreatedAtMixin, Base):
     __tablename__ = "news_articles"
     __table_args__ = (UniqueConstraint("raw_hash", name="uq_news_articles_raw_hash"),)

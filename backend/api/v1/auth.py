@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import secrets
 import threading
 import time
@@ -41,30 +42,40 @@ def _clean_email(email: str) -> str:
     return value
 
 
-async def _rate_limit(request: Request, key: str, limit: int = 8) -> None:
-    bucket = f"auth-rate:{request.client.host if request.client else 'unknown'}:{key}"
+async def _rate_limit(request: Request, action: str, email: str) -> None:
+    # The Next proxy shares one backend IP among users. Bound each account
+    # separately and keep a wider IP cap for bulk attempts.
+    digest = hmac.new(settings.jwt_secret.encode(), email.encode(), hashlib.sha256).hexdigest()
+    client_ip = request.client.host if request.client else "unknown"
+    buckets = ((f"auth-rate:{action}:email:{digest}", 8),
+               (f"auth-rate:{action}:ip:{client_ip}", 120))
     try:
         from redis.asyncio import Redis
 
         if settings.redis_url:
             client = Redis.from_url(settings.redis_url, socket_connect_timeout=1)
-            count = await client.incr(bucket)
-            if count == 1:
-                await client.expire(bucket, 60)
-            await client.aclose()
-            if count > limit:
-                raise HTTPException(status_code=429, detail="Too many attempts; retry in a minute")
+            try:
+                for bucket, limit in buckets:
+                    count = await client.incr(bucket)
+                    if count == 1:
+                        await client.expire(bucket, 60)
+                    if count > limit:
+                        raise HTTPException(status_code=429, detail="Too many attempts; retry in a minute")
+            finally:
+                await client.aclose()
             return
     except HTTPException:
         raise
     except Exception:
-        pass
+        if settings.environment.lower() == "production" and settings.redis_url:
+            raise HTTPException(status_code=503, detail="Authentication is temporarily unavailable") from None
     now = time.monotonic()
     with _attempt_lock:
-        recent = [stamp for stamp in _attempts.get(bucket, []) if now - stamp < 60]
-        if len(recent) >= limit:
-            raise HTTPException(status_code=429, detail="Too many attempts; retry in a minute")
-        _attempts[bucket] = [*recent, now]
+        for bucket, limit in buckets:
+            recent = [stamp for stamp in _attempts.get(bucket, []) if now - stamp < 60]
+            if len(recent) >= limit:
+                raise HTTPException(status_code=429, detail="Too many attempts; retry in a minute")
+            _attempts[bucket] = [*recent, now]
 
 
 def _access_token(user: User) -> str:
@@ -97,8 +108,8 @@ async def _create_session(user: User, response: Response, session) -> dict:
 
 @router.post("/register", status_code=201)
 async def register(payload: Credentials, request: Request, response: Response):
-    await _rate_limit(request, "register")
     email = _clean_email(payload.email)
+    await _rate_limit(request, "register", email)
     try:
         async with AsyncSessionLocal.begin() as session:
             if await session.scalar(select(User.id).where(User.email == email)):
@@ -115,8 +126,8 @@ async def register(payload: Credentials, request: Request, response: Response):
 
 @router.post("/login")
 async def login(payload: Credentials, request: Request, response: Response):
-    await _rate_limit(request, "login")
     email = _clean_email(payload.email)
+    await _rate_limit(request, "login", email)
     async with AsyncSessionLocal.begin() as session:
         user = await session.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
         valid = False

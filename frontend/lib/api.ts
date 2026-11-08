@@ -91,6 +91,8 @@ export type StockHistoryResponse = {
   data_mode?: DataMode | null
 }
 
+export type IndexHistoryResponse = StockHistoryResponse
+
 export type StockIndicators = {
   symbol: string
   indicators: {
@@ -399,8 +401,18 @@ export const getMarketIndices = async (): Promise<MarketIndicesResponse> => {
     data_mode: response.dataMode,
   }
 }
-export const getMarketStatus = () => get<MarketStatus>('/api/market/status')
-export const getTopMovers = () => get<TopMoversResponse>('/api/market/top-movers')
+export const getMarketStatus = () => get<MarketStatus>('/api/v1/market/status')
+export const getTopMovers = async (): Promise<TopMoversResponse> => {
+  const [gainers, losers] = await Promise.all([
+    get<{ items: Array<{ symbol: string; exchange: string | null; price: number | null; change: number | null; percentChange: number | null; volume: number | null }>; asOf: string | null }>('/api/v1/market/movers?type=gainers&limit=10'),
+    get<{ items: Array<{ symbol: string; exchange: string | null; price: number | null; change: number | null; percentChange: number | null; volume: number | null }>; asOf: string | null }>('/api/v1/market/movers?type=losers&limit=10'),
+  ])
+  const mapMovers = (items: typeof gainers.items): MarketMover[] => items.map((item) => ({
+    symbol: item.symbol, exchange: item.exchange ?? '', current_price: item.price,
+    price_change: item.change, percent_change: item.percentChange, volume: item.volume,
+  }))
+  return { updated_at: gainers.asOf ?? losers.asOf ?? '', gainers: mapMovers(gainers.items), losers: mapMovers(losers.items) }
+}
 export const getMarketBreadth = async (): Promise<MarketBreadth> => {
   const response = await get<{ advancing: number; declining: number; unchanged: number; asOf: string | null }>('/api/v1/market/breadth')
   return { advancers: response.advancing, decliners: response.declining, unchanged: response.unchanged,
@@ -515,6 +527,14 @@ export const getStockHistory = async (symbol: string, days = 180): Promise<Stock
     source: data.source, data_mode: data.dataMode }
 }
 
+export const getIndexHistory = async (symbol: string, days = 180): Promise<IndexHistoryResponse> => {
+  const data = await get<{ symbol: string; items: OHLCVCandle[]; asOf: string | null; source?: string | null; dataMode?: DataMode | null }>(
+    `/api/v1/market/indices/${encodeURIComponent(symbol.toUpperCase())}/history?limit=${Math.max(1, Math.min(days, 2500))}`,
+  )
+  return { symbol: data.symbol, days, candles: data.items, updated_at: data.asOf ?? '',
+    source: data.source, data_mode: data.dataMode }
+}
+
 export const getStockIndicators = async (symbol: string): Promise<StockIndicators> =>
   get<StockIndicators>(`/api/v1/stocks/${encodeURIComponent(symbol.toUpperCase())}/indicators`)
 
@@ -565,7 +585,7 @@ export const getNewsIntelligence = async (options: NewsQuery = {}): Promise<News
       sentimentScore: item.sentimentScore, sentimentMethod: item.sentimentMethod, reactions: item.reactions })),
   }
 }
-export const getDataSources = () => get<DataSourcesResponse>('/api/meta/data-sources')
+export const getDataSources = () => get<DataSourcesResponse>('/api/v1/meta')
 export const getMarketDataStatus = () => get<MarketDataStatus>('/api/v1/market/data-status')
 
 // ============================================================
@@ -573,10 +593,10 @@ export const getMarketDataStatus = () => get<MarketDataStatus>('/api/v1/market/d
 // ============================================================
 
 export const explainItem = (request: AIExplainRequest) =>
-  post<AIExplainResponse>('/api/ai/explain', request)
+  post<AIExplainResponse>('/api/v1/ai/explain', request)
 
 export const chatWithAI = (question: string, contextData?: Record<string, unknown>) =>
-  post<{ response: string }>('/api/ai/chat', {
+  post<{ response: string }>('/api/v1/ai/chat', {
     question,
     context_type: contextData?.type,
     context_title: contextData?.title,

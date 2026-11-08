@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from fastapi import APIRouter, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
 from db.models import IndexBar, PriceBar, ProviderJobRun, Symbol
@@ -175,16 +176,62 @@ async def indices():
             "source": get_configured_market_source_id(), "dataMode": _configured_data_mode()}
 
 
+@router.get("/indices/{symbol}/history")
+async def index_history(symbol: str, limit: int = Query(500, ge=1, le=2500)):
+    code = symbol.upper()
+    if code not in {"VNINDEX", "HNXINDEX", "UPCOMINDEX"}:
+        return JSONResponse(
+            status_code=404,
+            content={"error": {"code": "SYMBOL_NOT_FOUND", "message": f"Unknown index: {code}"}},
+        )
+
+    source = get_configured_market_source_id()
+    stmt = (
+        select(IndexBar)
+        .where(IndexBar.index_symbol == code, IndexBar.source == source)
+        .order_by(IndexBar.trade_date.desc())
+        .limit(limit)
+    )
+    async with AsyncSessionLocal() as session:
+        bars = list((await session.scalars(stmt)).all())
+    bars.reverse()
+    return {
+        "symbol": code,
+        "items": [{
+            "time": bar.trade_date.isoformat(),
+            "open": float(bar.open) if bar.open is not None else None,
+            "high": float(bar.high) if bar.high is not None else None,
+            "low": float(bar.low) if bar.low is not None else None,
+            "close": float(bar.close),
+            "volume": bar.volume,
+            "source": bar.source,
+            "dataMode": "synthetic-demo" if bar.source == "csv-demo" else "market-provider",
+        } for bar in bars],
+        "asOf": bars[-1].trade_date.isoformat() if bars else None,
+        "source": bars[-1].source if bars else None,
+        "dataMode": ("synthetic-demo" if bars[-1].source == "csv-demo" else "market-provider") if bars else None,
+    }
+
+
 @router.get("/data-status")
 async def data_status():
     source = get_configured_market_source_id()
     async with AsyncSessionLocal() as session:
+        listed_symbols = await session.scalar(select(func.count()).select_from(Symbol).where(
+            Symbol.is_active.is_(True), Symbol.exchange.in_(("HOSE", "HNX", "UPCOM"))
+        )) or 0
+        symbols_with_history = await session.scalar(select(func.count(func.distinct(PriceBar.symbol))).where(
+            PriceBar.source == source
+        )) or 0
         latest_price = await session.scalar(
             select(func.max(PriceBar.trade_date)).where(PriceBar.source == source)
         )
         latest_index = await session.scalar(
             select(func.max(IndexBar.trade_date)).where(IndexBar.source == source)
         )
+        symbols_current = (await session.scalar(select(func.count(func.distinct(PriceBar.symbol))).where(
+            PriceBar.source == source, PriceBar.trade_date >= latest_index
+        )) or 0) if latest_index else 0
         last_run = await session.scalar(
             select(ProviderJobRun).where(
                 ProviderJobRun.source == source,
@@ -199,6 +246,8 @@ async def data_status():
         "stale": stale,
         "priceAsOf": latest_price.isoformat() if latest_price else None,
         "indexAsOf": latest_index.isoformat() if latest_index else None,
+        "symbolCoverage": {"listed": listed_symbols, "withHistory": symbols_with_history,
+                           "currentToIndexDate": symbols_current},
         "lastRun": None if last_run is None else {
             "status": last_run.status,
             "startedAt": last_run.started_at,

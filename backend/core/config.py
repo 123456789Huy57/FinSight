@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,8 +17,9 @@ class Settings(BaseSettings):
     openrouter_model: str = "deepseek/deepseek-chat-v3.1"
     jwt_secret: str = "local-development-only-change-before-deploy"
     vnstock_api_key: str | None = None
-    vnstock_symbols: str = "VCB,ACB,MBB,BID,FPT,CMG,SSI,VRE,DXG,PVD,POW,GAS,HPG,SAB,KDC"
+    vnstock_symbols: str = "ALL"
     vnstock_request_delay_seconds: float = Field(default=6.0, ge=0)
+    provider_rpm: float = Field(default=60.0, gt=0)
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -28,6 +29,17 @@ class Settings(BaseSettings):
         if value.startswith("postgresql://"):
             return value.replace("postgresql://", "postgresql+asyncpg://", 1)
         return value
+
+    @model_validator(mode="after")
+    def require_production_jwt_secret(self) -> "Settings":
+        if self.environment.lower() == "production" and (
+            not self.jwt_secret
+            or self.jwt_secret == "local-development-only-change-before-deploy"
+            or len(self.jwt_secret.encode("utf-8")) < 32
+            or len(set(self.jwt_secret)) < 8
+        ):
+            raise ValueError("JWT_SECRET must be a strong, non-default value in production")
+        return self
 
     model_config = SettingsConfigDict(
         env_file=(".env", "backend/.env"),

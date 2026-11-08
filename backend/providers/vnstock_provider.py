@@ -40,10 +40,16 @@ class VnstockProvider(MarketDataProvider):
         except (KeyError, AttributeError, ValueError):
             frame["sector"] = None
         columns = [column for column in ("symbol", "name", "exchange", "sector") if column in frame]
-        selected = {symbol.strip().upper() for symbol in settings.vnstock_symbols.split(",") if symbol.strip()}
+        configured = settings.vnstock_symbols.strip().upper()
+        selected = {symbol.strip().upper() for symbol in configured.split(",") if symbol.strip()}
         if not selected:
             raise ValueError("VNSTOCK_SYMBOLS must contain at least one ticker")
-        filtered = frame.loc[frame["symbol"].astype(str).str.upper().isin(selected), columns]
+        if configured == "ALL":
+            # DELISTED entries remain in the provider directory but cannot
+            # contribute current prices to the active market board.
+            filtered = frame.loc[frame["exchange"].astype(str).str.upper().isin({"HOSE", "HNX", "UPCOM"}), columns]
+        else:
+            filtered = frame.loc[frame["symbol"].astype(str).str.upper().isin(selected), columns]
         return filtered.drop_duplicates("symbol").reset_index(drop=True)
 
     def get_quote_snapshot(self, symbols: list[str]) -> pd.DataFrame:

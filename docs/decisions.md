@@ -136,3 +136,31 @@
 - Chỉ ingest 15 mã được cấu hình, ba chỉ số, và giới hạn nhịp gọi. Bản public/Render vẫn dùng `csv-demo`; trước khi hiển thị giá thật công khai cần xác nhận quyền lưu và hiển thị từ chủ nguồn dữ liệu.
 - Kiểm tra trực tiếp với Vnstock 5.2.1 chưa có key trả `EntitlementError` cho `reference.market.symbols_by_exchange`; cần khóa Community miễn phí để hoàn tất kiểm tra end-to-end.
 - T+1/T+5 chỉ hiện số khi `status=measured`, `dataMode=market-provider` và có `methodVersion`; còn lại hiện "Dữ liệu minh hoạ" (hàm `reactionLabel` trong `lib/reactions.ts`).
+
+## BE-VN-FULL: Toàn bộ mã đang giao dịch (08/11/2026)
+- Chủ dự án yêu cầu danh mục đầy đủ kiểu bảng giá thị trường. Vnstock `Reference().equity.list_by_exchange()` trả 1.755 mã: HOSE 408, HNX 299, UPCOM 809, DELISTED 239 tại lần kiểm tra; ứng dụng nhập 1.516 mã thuộc ba sàn đang giao dịch. `VNSTOCK_SYMBOLS=ALL` là mặc định; không coi 15 mã thử ban đầu là giới hạn của Vnstock.
+- Lịch sử giá hai năm được nhập từng lô 50 mã, có checkpoint trong `universe_sync_attempts` để tiếp tục sau khởi động lại. Worker giữ nhịp 6 giây/lượt và dừng lô mới khi mức dùng tài khoản chạm 80% hạn mức theo phút, giờ, ngày hoặc tháng. Giao diện thị trường chỉ hiển thị mã đã có giá, còn tìm kiếm có thể thấy mã trước khi lịch sử tải xong.
+- Community cho một thiết bị. Docker reset data store đã làm mất định danh thiết bị và cơ sở dữ liệu cục bộ ngày 08/11/2026; chủ dự án đã gỡ thiết bị cũ và worker đăng ký lại thành công. Đây là dữ liệu thử nghiệm cục bộ, không thay thế quyền phân phối dữ liệu công khai.
+
+## BE-05: Chuyển API cũ sang `/api/v1`
+
+- Repo hiện có 16 route cũ ngoài `/api/v1`, không phải 21 như số đếm trong kế hoạch. Chỉ 5 route còn caller trong `frontend/lib/api.ts`; các proxy cũ tương ứng được gỡ. `/`, `/health`, `/ready` được giữ.
+
+| Route cũ | Caller còn dùng trước khi chuyển | Route v1 |
+|---|---|---|
+| `/meta/data-sources` | `getDataSources` | `/api/v1/meta` |
+| `/stock/{symbol}/profile` | Không | `/api/v1/stocks/{symbol}` |
+| `/stock/{symbol}/history` | Không | `/api/v1/stocks/{symbol}/history` |
+| `/market/search` | Không | `/api/v1/search` |
+| `/quote/{symbol}` | Không | `/api/v1/stocks/{symbol}` |
+| `/market/indices` | Không | `/api/v1/market/indices` |
+| `/market/status` | `getMarketStatus` | `/api/v1/market/status` |
+| `/market/top-movers` | `getTopMovers` | `/api/v1/market/movers` |
+| `/market/breadth` | Không | `/api/v1/market/breadth` |
+| `/market/most-active` | Không | `/api/v1/market/active` |
+| `/market/sectors` | Không | `/api/v1/market/sectors` |
+| `/market/screener` | Không | `/api/v1/stocks` |
+| `/market/commentary` | Không | `/api/v1/market/commentary` |
+| `/news/intelligence` | Không | `/api/v1/news` |
+| `/ai/explain` | `explainItem` | `/api/v1/ai/explain` |
+| `/ai/chat` | `chatWithAI` | `/api/v1/ai/chat` |

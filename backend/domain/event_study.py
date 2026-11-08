@@ -166,6 +166,7 @@ def calculate_event_study(
         t1 = _empty_window(status, reason)
         t5 = _empty_window(status, reason)
     else:
+        assert event_date is not None
         t1 = _measure_window(
             horizon=1,
             event_index=event_index,

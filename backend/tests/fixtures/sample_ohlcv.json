@@ -1,0 +1,9 @@
+{
+  "source": "fixture-only",
+  "symbol": "FPT",
+  "unit": "thousand-vnd",
+  "bars": [
+    {"time": "2026-11-05", "open": 50.0, "high": 51.0, "low": 49.5, "close": 50.5, "volume": 1000000},
+    {"time": "2026-11-06", "open": 50.5, "high": 51.5, "low": 50.0, "close": 50.8, "volume": 1100000}
+  ]
+}

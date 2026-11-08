@@ -42,8 +42,11 @@ services:
       - DATABASE_URL=postgresql+asyncpg://finsight:finsight@db:5432/finsight
       - REDIS_URL=redis://redis:6379/0
       - MARKET_PROVIDER=${MARKET_PROVIDER:-csv}
+      - JWT_SECRET=${JWT_SECRET:-local-development-only-change-before-deploy}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - PROVIDER_RPM=${PROVIDER_RPM:-60}
       - VNSTOCK_API_KEY=${VNSTOCK_API_KEY:-}
-      - VNSTOCK_SYMBOLS=${VNSTOCK_SYMBOLS:-VCB,ACB,MBB,BID,FPT,CMG,SSI,VRE,DXG,PVD,POW,GAS,HPG,SAB,KDC}
+      - VNSTOCK_SYMBOLS=${VNSTOCK_SYMBOLS:-ALL}
       - VNSTOCK_REQUEST_DELAY_SECONDS=${VNSTOCK_REQUEST_DELAY_SECONDS:-6}
       - NEWS_FEED_ENABLED=${NEWS_FEED_ENABLED:-true}
       - RUN_SNAPSHOT_JOBS=false
@@ -74,8 +77,10 @@ services:
       - DATABASE_URL=postgresql+asyncpg://finsight:finsight@db:5432/finsight
       - REDIS_URL=redis://redis:6379/0
       - MARKET_PROVIDER=${MARKET_PROVIDER:-csv}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - PROVIDER_RPM=${PROVIDER_RPM:-60}
       - VNSTOCK_API_KEY=${VNSTOCK_API_KEY:-}
-      - VNSTOCK_SYMBOLS=${VNSTOCK_SYMBOLS:-VCB,ACB,MBB,BID,FPT,CMG,SSI,VRE,DXG,PVD,POW,GAS,HPG,SAB,KDC}
+      - VNSTOCK_SYMBOLS=${VNSTOCK_SYMBOLS:-ALL}
       - VNSTOCK_REQUEST_DELAY_SECONDS=${VNSTOCK_REQUEST_DELAY_SECONDS:-6}
       - NEWS_FEED_ENABLED=${NEWS_FEED_ENABLED:-true}
       - RUN_SNAPSHOT_JOBS=true

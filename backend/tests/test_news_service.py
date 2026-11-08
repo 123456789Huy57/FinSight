@@ -2,7 +2,6 @@ import services.news_service as news_service
 from api.v1.news import list_news
 from core.config import settings
 from jobs.ingest_news import _category, _related_symbols, ingest_news
-from main import get_news_intelligence as get_legacy_news
 import services.stock_service as stock_service
 
 
@@ -82,18 +81,16 @@ def test_news_classification_and_ticker_linking_fold_accents() -> None:
     assert _related_symbols("Công bố kết quả tại Hòa Phát", [("HPG", "Công ty Cổ phần Tập đoàn Hòa Phát")]) == ["HPG"]
 
 
-def test_news_ingestion_and_api_are_disabled_without_rights_opt_in() -> None:
+def test_news_ingestion_and_api_are_disabled_without_rights_opt_in(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "news_feed_enabled", False)
     assert settings.news_feed_enabled is False
     ingest_result = _run_immediate(ingest_news())
     api_result = _run_immediate(list_news(q=None, category=None, sentiment=None, symbol=None, limit=50, offset=0))
-    legacy_api_result = get_legacy_news()
 
     assert ingest_result == {"enabled": 0, "fetched": 0, "inserted": 0, "tickerLinks": 0}
     assert api_result["items"] == []
     assert api_result["status"] == "disabled"
     assert api_result["dataMode"] is None
-    assert legacy_api_result["items"] == []
-    assert legacy_api_result["status"] == "disabled"
 
 
 

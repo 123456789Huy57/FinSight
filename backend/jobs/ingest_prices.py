@@ -1,4 +1,3 @@
-import asyncio
 import math
 from datetime import date, datetime, timezone
 from typing import Any
@@ -13,6 +12,7 @@ from db.session import AsyncSessionLocal
 from domain.text import normalize_vi
 from providers.base import MarketDataProvider
 from providers.factory import get_market_provider
+from providers.resilience import TokenBucket, call_with_retry
 
 
 def _column(frame: pd.DataFrame, candidates: tuple[str, ...]) -> str | None:
@@ -83,6 +83,15 @@ def _bars_for(
     return [records_by_date[key] for key in sorted(records_by_date)]
 
 
+def _is_provider_limit_error(exc: Exception, provider: MarketDataProvider) -> bool:
+    if provider.source_id != "vnstock":
+        return False
+    # Vnstock is optional in public/CSV builds; import its typed errors only here.
+    from vnstock.core.exceptions import EntitlementError, RateLimitedError
+
+    return isinstance(exc, (EntitlementError, RateLimitedError)) or getattr(exc, "status", None) == 429
+
+
 async def ingest_price_history(
     start: date,
     end: date,
@@ -136,7 +145,11 @@ async def _ingest_price_history(
     symbols: list[str] | None,
     request_delay_seconds: float,
 ) -> dict[str, int | str]:
-    listing = await asyncio.to_thread(provider.list_symbols)
+    effective_rpm = float(settings.provider_rpm)
+    if request_delay_seconds > 0:
+        effective_rpm = min(effective_rpm, 60.0 / request_delay_seconds)
+    limiter = TokenBucket(effective_rpm)
+    listing = await call_with_retry(provider.list_symbols, limiter=limiter)
     if listing.empty:
         raise RuntimeError("Selected market provider returned no symbols")
 
@@ -182,10 +195,10 @@ async def _ingest_price_history(
                                     "empty_indices": 0}
     result["source"] = provider.source_id
     result["dataMode"] = provider.data_mode
-    for index, symbol_row in enumerate(symbol_records):
+    for symbol_row in symbol_records:
         symbol = symbol_row["symbol"]
         try:
-            frame = await asyncio.to_thread(provider.get_ohlcv, symbol, start, end, "1D")
+            frame = await call_with_retry(provider.get_ohlcv, symbol, start, end, "1D", limiter=limiter)
             records = _bars_for(symbol, frame, provider)
             if records:
                 async with AsyncSessionLocal.begin() as session:
@@ -206,14 +219,14 @@ async def _ingest_price_history(
             else:
                 result["empty_symbols"] += 1
         except Exception as exc:
+            if _is_provider_limit_error(exc, provider):
+                raise
             result["failed_symbols"] += 1
             print(f"OHLCV ingestion failed for {symbol}: {exc}", flush=True)
-        if request_delay_seconds and index < len(symbol_records) - 1:
-            await asyncio.sleep(request_delay_seconds)
 
     for index_symbol in ("VNINDEX", "HNXINDEX", "UPCOMINDEX"):
         try:
-            frame = await asyncio.to_thread(provider.get_index_history, index_symbol, start, end)
+            frame = await call_with_retry(provider.get_index_history, index_symbol, start, end, limiter=limiter)
             if frame is None or frame.empty:
                 result["empty_indices"] += 1
                 continue
@@ -236,6 +249,8 @@ async def _ingest_price_history(
                     ))
                 result["index_bars"] = result.get("index_bars", 0) + len(records)
         except Exception as exc:
+            if _is_provider_limit_error(exc, provider):
+                raise
             result["failed_indices"] += 1
             print(f"Index history ingestion failed for {index_symbol}: {exc}", flush=True)
     return result
