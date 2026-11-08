@@ -63,7 +63,7 @@ docker compose up --build
 - Readiness (Compose): http://localhost:8000/ready
 - API v1 qua frontend: http://localhost:3000/api/v1/market/overview
 
-Để chạy dữ liệu Vnstock Community cục bộ, đặt `MARKET_PROVIDER=vnstock`, `INSTALL_VNSTOCK=true`, `VNSTOCK_API_KEY` và `VNSTOCK_SYMBOLS=ALL` trong `.env`. Worker nhập danh mục HOSE/HNX/UPCOM trước, sau đó tải lịch sử giá theo lô; xem tiến độ tại http://localhost:8000/api/v1/market/data-status (`symbolCoverage`). Bản Render công khai vẫn dùng CSV demo. Xem [hướng dẫn Vnstock](backend/VNSTOCK_SETUP.md).
+Để chạy dữ liệu Vnstock Community cục bộ, đặt `MARKET_PROVIDER=vnstock`, `INSTALL_VNSTOCK=true`, `VNSTOCK_API_KEY` và `VNSTOCK_SYMBOLS=ALL` trong `.env`. Worker nhập danh mục HOSE/HNX/UPCOM, lấy bảng giá nhiều mã trong một request (mỗi 5 phút trong phiên), rồi tải lịch sử hai năm theo lô riêng. Bảng giá ở http://localhost:8000/api/v1/market/board; tiến độ lịch sử ở http://localhost:8000/api/v1/market/data-status. Bản Render công khai vẫn dùng CSV demo. Xem [hướng dẫn Vnstock](backend/VNSTOCK_SETUP.md) và [kiến trúc dữ liệu thị trường](docs/market-data-architecture.md).
 
 ---
 
@@ -126,7 +126,7 @@ Truy cập http://localhost:3000.
 | `JWT_SECRET` | Secret ký access token; production phải dùng chuỗi ngẫu nhiên riêng | Có ở production |
 | `VNSTOCK_API_KEY` | Key Community miễn phí cho adapter cục bộ; không cấu hình cho public demo | Tùy chọn |
 | `INSTALL_VNSTOCK` | Đặt `true` để cài gói Vnstock vào image Docker cục bộ | Không |
-| `VNSTOCK_SYMBOLS` | Danh sách 15 mã mặc định cho ingest Vnstock; giữ nhỏ để không vượt quota | Không |
+| `VNSTOCK_SYMBOLS` | `ALL` lấy danh mục HOSE/HNX/UPCOM; có thể dùng danh sách mã để giới hạn | Không |
 | `VNSTOCK_REQUEST_DELAY_SECONDS` | Khoảng nghỉ giữa các lần lấy lịch sử cổ phiếu (mặc định 6 giây) | Không |
 
 ---

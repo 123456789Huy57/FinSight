@@ -94,6 +94,7 @@ Factory hiện tại ở backend/providers/factory.py chỉ ánh xạ csv → cs
 - Normalizer chấp nhận một số tên cột khác nhau, bỏ bar thiếu ngày/close hoặc giá không hợp lệ, đổi đơn vị theo stock_price_multiplier, và lưu adjusted_close khi provider trả trường này.
 - Mỗi lần ingest ghi trạng thái vào provider_job_runs; API data status dựa trên dữ liệu và lần chạy gần nhất.
 - CSV demo có 15 mã synthetic. Vnstock trả 1.516 mã đang giao dịch tại lần kiểm tra 08/11/2026; lịch sử giá được nhập dần theo lô, xem `symbolCoverage` ở `/api/v1/market/data-status`.
+- Với Vnstock, job `ingest_quotes.py` lấy bảng giá 1.516 mã trong một request KBS, mỗi 5 phút trong phiên và một lần mỗi ngày ngoài phiên; lưu một snapshot mới nhất trong `market_snapshots`. `/api/v1/market/board` trả snapshot này mà không gọi provider trong request trình duyệt.
 
 Worker Compose hiện:
 
@@ -103,7 +104,7 @@ Worker Compose hiện:
 - Chạy RSS mỗi 15 phút khi NEWS_FEED_ENABLED=true.
 - Chạy ingest giá lịch sử EOD lúc 15:40 giờ Việt Nam các ngày thứ Hai–thứ Sáu.
 
-Phần trên hiện chưa phải luồng lưu quote từng phút vào bảng thời gian thực. API v1 stocks/market đọc bar đã lưu trong database. Dashboard cũng polling trình duyệt theo phiên mở cửa, nhưng polling UI tự nó không làm provider trả dữ liệu realtime và không thay thế job lưu quote.
+Snapshot bảng giá có thời điểm **lấy dữ liệu**, không có timestamp giao dịch riêng của từng mã và không được gọi là realtime. Trang thị trường đọc snapshot KBS; dashboard, trang mã và event study vẫn đọc daily bar VCI. Chưa đồng nhất các bề mặt đó thành một luồng quote trong phiên.
 
 ## 5. API hiện có
 
@@ -230,7 +231,7 @@ Không đặt API key tài chính thành biến NEXT_PUBLIC_*, không commit .en
 1. **Nguồn thật, EOD hoặc delayed:** giá đến từ provider thật, nhưng cập nhật theo cuối ngày hoặc độ trễ/chu kỳ mà hợp đồng cho phép.
 2. **Realtime/intraday:** cần sản phẩm dữ liệu tương ứng, quyền sử dụng, endpoint/stream, worker hoặc consumer stream, quy tắc quota và UI hiển thị thời điểm dữ liệu.
 
-FinSight hiện hỗ trợ daily bars về mặt database. Muốn dashboard có quote intraday nhất quán giữa dashboard, screener và trang mã thì còn phải lưu/đọc quote snapshot hoặc thiết kế API snapshot chung; không chỉ cập nhật một endpoint cũ.
+FinSight có daily bars và snapshot KBS cho riêng bảng giá thị trường. Muốn dashboard và trang mã có quote trong phiên nhất quán với bảng giá thì cần cho các bề mặt đó đọc cùng snapshot và xác nhận timestamp/độ trễ của nguồn; không suy ra realtime từ chu kỳ lấy 5 phút.
 
 ### Các đường khả thi
 
@@ -296,16 +297,15 @@ DNSE cần secrets tương ứng API key/API secret và chữ ký mới theo req
 5. Kiểm tra gap ngày, lịch giao dịch, symbol coverage và số bar trước khi bật provider.
 6. Nếu cần T+1/T+5, phải có adjusted close thật và VNINDEX cùng provider/cùng ngày. Tài liệu OHLCV cơ bản không tự đảm bảo adjusted close; xác nhận corporate actions với nguồn hoặc xây dữ liệu adjustment đã được cấp quyền.
 
-### Bước E — Thêm quote snapshot nếu yêu cầu intraday
+### Bước E — Đồng nhất snapshot trên các trang
 
-Daily close không phải realtime. Để quote trên dashboard, market và stock khớp nhau:
+Trang thị trường đã dùng snapshot KBS lấy mỗi 5 phút và lưu trong PostgreSQL. Daily close VCI vẫn là nguồn riêng cho biểu đồ và event study. Để dashboard và trang mã có cùng quote với bảng giá:
 
-1. Chốt nguồn snapshot (REST polling hay WebSocket), độ trễ mong muốn và giới hạn request.
-2. Thêm job/consumer theo chu kỳ được provider cho phép; batch symbols nếu API hỗ trợ.
-3. Lưu snapshot hoặc thêm model phù hợp để có source, timestamp nguồn, timestamp ingest và trạng thái.
-4. Định nghĩa API duy nhất cho latest quote; cho cả dashboard, screener và trang mã đọc cùng snapshot.
-5. Dừng polling ngoài phiên/ở tab ẩn hoặc khi stale; không coi 10 giây poll của browser là cam kết realtime.
-6. Hiển thị “realtime”, “delayed”, “EOD” dựa trên hợp đồng và timestamp thật; không suy ra từ provider name.
+1. Cho các trang đó đọc cùng snapshot hoặc một API theo mã dẫn xuất từ snapshot.
+2. Bổ sung timestamp giao dịch từ nguồn nếu có, thay vì chỉ có giờ lấy dữ liệu.
+3. Bổ sung khối lượng và dữ liệu định giá từ nguồn được phép dùng; không lấy số cũ gắn vào quote mới.
+4. Dừng polling ngoài phiên hoặc ở tab ẩn; chu kỳ 5 phút không phải cam kết realtime.
+5. Hiển thị độ trễ theo hợp đồng nguồn và xác nhận quyền phân phối trước khi đưa giá lên bản công khai.
 
 ### Bước F — Cấu hình chạy
 

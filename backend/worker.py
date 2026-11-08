@@ -15,13 +15,14 @@ from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import func, select
 
 from core.config import settings
-from db.models import PriceBar
+from db.models import MarketSnapshot, PriceBar
 from db.session import AsyncSessionLocal
 from jobs.ingest_prices import ingest_price_history
 from jobs.ingest_news import ingest_news
+from jobs.ingest_quotes import ingest_quote_board, quote_refresh_due
 from jobs.ingest_symbols import ingest_symbols
 from jobs.compute_event_studies import compute_news_event_studies
-from jobs.sync_universe import sync_universe_batch
+from jobs.sync_universe import quota_has_headroom, sync_universe_batch
 from providers.factory import get_configured_market_source_id
 
 
@@ -87,6 +88,27 @@ async def _run_universe_sync() -> None:
         print(f"[{datetime.now(VN_TZ).isoformat()}] Universe history batch failed: {exc}", flush=True)
 
 
+async def _run_quote_board() -> None:
+    try:
+        import vnstock
+
+        async with AsyncSessionLocal() as session:
+            last_snapshot = await session.scalar(
+                select(MarketSnapshot.as_of)
+                .where(MarketSnapshot.payload["source"].as_string() == "vnstock")
+                .order_by(MarketSnapshot.as_of.desc()).limit(1)
+            )
+        if not quote_refresh_due(datetime.now(VN_TZ), last_snapshot):
+            return
+        if not quota_has_headroom(vnstock.usage()):
+            print("Quote board refresh paused for provider quota", flush=True)
+            return
+        result = await ingest_quote_board()
+        print(f"[{datetime.now(VN_TZ).isoformat()}] Quote board refreshed: {result}", flush=True)
+    except Exception as exc:
+        print(f"[{datetime.now(VN_TZ).isoformat()}] Quote board refresh failed: {exc}", flush=True)
+
+
 async def main() -> None:
     await _initial_sync()
     scheduler = AsyncIOScheduler(timezone=VN_TZ)
@@ -100,6 +122,9 @@ async def main() -> None:
     scheduler.add_job(_initial_sync, IntervalTrigger(hours=1), id="initial-history-retry",
                       max_instances=1, coalesce=True, misfire_grace_time=3600)
     if settings.market_provider.lower() == "vnstock" and settings.vnstock_symbols.strip().upper() == "ALL":
+        scheduler.add_job(_run_quote_board, IntervalTrigger(minutes=5), id="quote-board",
+                          max_instances=1, coalesce=True, misfire_grace_time=300,
+                          next_run_time=datetime.now(VN_TZ))
         scheduler.add_job(_run_universe_sync, IntervalTrigger(minutes=1), id="universe-history",
                           max_instances=1, coalesce=True, misfire_grace_time=300,
                           next_run_time=datetime.now(VN_TZ))

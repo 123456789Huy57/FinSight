@@ -1,12 +1,14 @@
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
-from db.models import IndexBar, PriceBar, ProviderJobRun, Symbol
+from db.models import IndexBar, MarketSnapshot, PriceBar, ProviderJobRun, Symbol
 from db.session import AsyncSessionLocal
 from domain.provider_status import market_data_status
+from jobs.ingest_quotes import quote_refresh_due
 from providers.factory import get_configured_market_source_id
 
 router = APIRouter(prefix="/api/v1/market", tags=["v1 market"])
@@ -55,6 +57,42 @@ def _stock_row(symbol: Symbol, bar: PriceBar, previous_close):
         "source": bar.source,
         "dataMode": "synthetic-demo" if bar.source == "csv-demo" else "market-provider",
     }
+
+
+@router.get("/board")
+async def quote_board():
+    """Serve one persisted market snapshot; browser requests never call the provider."""
+    source = get_configured_market_source_id()
+    if source != "vnstock":
+        rows = await _latest_bars()
+        items = [_stock_row(*row) for row in rows]
+        return {"items": items, "total": len(items), "source": source,
+                "dataMode": _configured_data_mode(), "quoteSource": None, "snapshotAt": None,
+                "status": "current" if items else "no_data"}
+    async with AsyncSessionLocal() as session:
+        snapshot = await session.scalar(
+            select(MarketSnapshot).where(MarketSnapshot.payload["source"].as_string() == source)
+            .order_by(MarketSnapshot.as_of.desc()).limit(1)
+        )
+        if snapshot is None:
+            directory = (await session.execute(
+                select(Symbol.symbol, Symbol.name, Symbol.exchange, Symbol.sector)
+                .where(Symbol.is_active.is_(True), Symbol.exchange.in_(("HOSE", "HNX", "UPCOM")))
+                .order_by(Symbol.symbol)
+            )).all()
+            items = [{"symbol": code, "name": name, "exchange": exchange, "sector": sector,
+                      "price": None, "referencePrice": None, "change": None, "percentChange": None}
+                     for code, name, exchange, sector in directory]
+            return {"items": items, "total": len(items), "source": source,
+                    "dataMode": _configured_data_mode(), "quoteSource": None, "snapshotAt": None,
+                    "status": "no_data"}
+    now = datetime.now(timezone.utc)
+    fresh = (now - snapshot.as_of).total_seconds() < 600 or not quote_refresh_due(now, snapshot.as_of)
+    return {"items": snapshot.payload["items"], "total": len(snapshot.payload["items"]),
+            "source": source, "dataMode": _configured_data_mode(),
+            "quoteSource": snapshot.payload.get("quoteSource"),
+            "snapshotAt": snapshot.as_of.isoformat(),
+            "status": "current" if fresh else "stale"}
 
 
 @router.get("/overview")

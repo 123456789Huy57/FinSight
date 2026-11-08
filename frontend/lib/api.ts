@@ -306,6 +306,7 @@ export type ScreenerStock = {
   exchange: string
   sector: string
   current_price: number | null
+  reference_price?: number | null
   price_change: number | null
   percent_change: number | null
   volume: number | null
@@ -512,17 +513,38 @@ export const getScreenerData = async (options: ScreenerOptions = {}): Promise<Sc
   }
 }
 
-export const getScreenerUniverse = async (q?: string): Promise<ScreenerResponse> => {
-  const options: ScreenerOptions = { q, sort: 'symbol', limit: 200 }
-  const first = await getScreenerData(options)
-  const pages: ScreenerResponse[] = [first]
-  for (let offset = 200; offset < first.count; offset += 800) {
-    const offsets = Array.from({ length: Math.min(4, Math.ceil((first.count - offset) / 200)) }, (_, i) => offset + i * 200)
-    pages.push(...await Promise.all(offsets.map((pageOffset) => getScreenerData({ ...options, offset: pageOffset }))))
+export type MarketBoardResponse = {
+  stocks: ScreenerStock[]
+  count: number
+  data_mode: 'synthetic-demo' | 'market-provider'
+  source: string
+  snapshot_at: string | null
+  quote_source: string | null
+  status: 'current' | 'stale' | 'no_data'
+}
+
+export const getMarketBoard = async (): Promise<MarketBoardResponse> => {
+  const response = await get<{
+    items: Array<{ symbol: string; name: string | null; exchange: string | null; sector: string | null;
+      price: number | null; referencePrice?: number | null; change: number | null;
+      percentChange: number | null; volume?: number | null }>
+    total: number
+    dataMode: 'synthetic-demo' | 'market-provider'
+    source: string
+    quoteSource: string | null
+    snapshotAt: string | null
+    status: 'current' | 'stale' | 'no_data'
+  }>('/api/v1/market/board')
+  return {
+    count: response.total, data_mode: response.dataMode, source: response.source,
+    snapshot_at: response.snapshotAt, quote_source: response.quoteSource, status: response.status,
+    stocks: response.items.map((item) => ({
+      symbol: item.symbol, name: item.name, exchange: item.exchange ?? '', sector: item.sector ?? '',
+      current_price: item.price, reference_price: item.referencePrice ?? null,
+      price_change: item.change, percent_change: item.percentChange,
+      volume: item.volume ?? null,
+    })),
   }
-  const stocks = Array.from(new Map(pages.flatMap((page) => page.stocks.map((stock) => [stock.symbol, stock]))).values())
-  const updated_at = pages.reduce((latest, page) => page.updated_at > latest ? page.updated_at : latest, '')
-  return { ...first, updated_at, stocks }
 }
 
 // ============================================================

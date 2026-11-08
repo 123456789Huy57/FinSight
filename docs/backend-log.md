@@ -52,3 +52,11 @@
 - Sau khi khôi phục thiết bị Docker Vnstock, lô đầu nhập 50 mã/20.771 nến, không lỗi; các lô sau chạy nền, có ngưỡng giữ lại 20% quota.
 - Migration 0009 upgrade → downgrade → upgrade qua trên database tạm; `mypy domain` và Ruff qua. T+1/T+5 chưa thể có ba tin `measured`: RSS hiện chỉ có tin 06–08/11, chưa đủ cửa sổ T+5.
 - Bảng giá lấy tất cả trang API theo thứ tự mã, cho xem thêm từng 100 dòng và hiện số mã đã có giá trên 1.516 mã niêm yết. Kiểm tra Compose: 163 mã đã có giá; nút Xem thêm hiển thị đủ 163 dòng. Frontend lint (1 warning cũ), 12 test và build qua.
+
+## BE-VN-FAST — bảng giá nhanh, tách khỏi lịch sử
+- Worker lấy một quote KBS cho 1.516 mã mỗi 5 phút, lưu snapshot mới nhất; API `/api/v1/market/board` đọc PostgreSQL, không gọi provider theo lượt xem. Trang thị trường tải một request và lọc trên 1.516 mã; chỉ vẽ 100 dòng đầu.
+- Payload thật: 1.516 dòng, 930 mã có giá khớp, 1.516 mã có giá tham chiếu; mã thiếu giá khớp giữ null. Endpoint đo cục bộ 257 ms. Worker mới đã làm mới quote thành công, lịch sử tiếp tục chạy.
+- Kiểm tra: Ruff, mypy domain, 63 backend test (coverage 87,91%), frontend lint (1 warning cũ), 12 test và build qua; kiểm tra trực quan bảng giá, tìm VCB và cột dữ liệu.
+- Tối ưu lô lịch sử: không gọi lại 3 chỉ số khi VN-Index đã có, chỉ checkpoint sau khi lô xong; chạy lại 63 backend test và Ruff/mypy đều qua.
+- Worker giới hạn refresh quote mỗi 5 phút trong phiên, ngoài phiên một lần/ngày và sau đóng cửa; test lịch giao dịch qua. Trang tự lấy snapshot mới mỗi 5 phút khi đang mở và khi quay lại tab, không che bảng đang xem.
+- Sau triển khai Compose, API qua frontend trả 1.516 mã, 930 mã có giá khớp, 1.516 mã có giá tham chiếu trong 232 ms; trang `/market` HTTP 200. Lô lịch sử tiếp theo nhập thêm 16.451 nến/50 mã, 0 lỗi. Full backend suite trong container sau lần build cuối: 63 test qua, coverage 87,91%; migration head qua.

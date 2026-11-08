@@ -66,22 +66,24 @@ async def sync_universe_batch(batch_size: int = 50) -> dict[str, int | str | Non
     earliest = min((latest for _, latest in due if latest is not None), default=None)
     start = (earliest - timedelta(days=7)) if earliest else date.today() - timedelta(days=730)
 
-    # A batch is one durable checkpoint. A provider failure leaves the remaining
-    # universe untouched; the same ticker is eligible again on the next index date.
-    try:
-        result = await ingest_price_history(start=start, end=date.today(), symbols=symbols)
-    finally:
-        async with AsyncSessionLocal.begin() as session:
-            statement = insert(UniverseSyncAttempt).values([
-                {"source": source, "symbol": symbol, "target_trade_date": target,
-                 "attempted_at": datetime.now(timezone.utc)} for symbol in symbols
-            ])
-            await session.execute(statement.on_conflict_do_update(
-                index_elements=[UniverseSyncAttempt.source, UniverseSyncAttempt.symbol],
-                set_={"target_trade_date": statement.excluded.target_trade_date,
-                      "attempted_at": statement.excluded.attempted_at},
-            ))
+    # Daily index history is fetched once on a fresh database; the EOD job
+    # advances it later. A failed provider batch is retried, not checkpointed.
+    result = await ingest_price_history(start=start, end=date.today(), symbols=symbols,
+                                        include_indices=index_as_of is None)
+    async with AsyncSessionLocal.begin() as session:
+        checkpoint_target = (await session.scalar(select(func.max(IndexBar.trade_date)).where(
+            IndexBar.source == source, IndexBar.index_symbol == "VNINDEX"
+        ))) or target
+        statement = insert(UniverseSyncAttempt).values([
+            {"source": source, "symbol": symbol, "target_trade_date": checkpoint_target,
+             "attempted_at": datetime.now(timezone.utc)} for symbol in symbols
+        ])
+        await session.execute(statement.on_conflict_do_update(
+            index_elements=[UniverseSyncAttempt.source, UniverseSyncAttempt.symbol],
+            set_={"target_trade_date": statement.excluded.target_trade_date,
+                  "attempted_at": statement.excluded.attempted_at},
+        ))
     remaining = len(choose_due_symbols(rows, target, len(rows))) - len(due)
-    return {"source": source, "target": target.isoformat(), "attempted": len(due),
+    return {"source": source, "target": checkpoint_target.isoformat(), "attempted": len(due),
             "remaining": remaining, "bars": int(result["bars"]),
             "failed": int(result["failed_symbols"]), "empty": int(result["empty_symbols"])}

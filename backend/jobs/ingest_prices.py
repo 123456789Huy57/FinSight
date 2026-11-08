@@ -97,6 +97,7 @@ async def ingest_price_history(
     end: date,
     symbols: list[str] | None = None,
     request_delay_seconds: float | None = None,
+    include_indices: bool = True,
 ) -> dict[str, int | str]:
     provider = get_market_provider()
     if request_delay_seconds is None:
@@ -108,7 +109,7 @@ async def ingest_price_history(
             id=run_id, source=provider.source_id, job_name="price-history", status="running",
         ))
     try:
-        result = await _ingest_price_history(provider, start, end, symbols, request_delay_seconds)
+        result = await _ingest_price_history(provider, start, end, symbols, request_delay_seconds, include_indices)
     except Exception as exc:
         try:
             await _finish_provider_run(run_id, "failed", None, str(exc))
@@ -144,6 +145,7 @@ async def _ingest_price_history(
     end: date,
     symbols: list[str] | None,
     request_delay_seconds: float,
+    include_indices: bool,
 ) -> dict[str, int | str]:
     effective_rpm = float(settings.provider_rpm)
     if request_delay_seconds > 0:
@@ -224,7 +226,7 @@ async def _ingest_price_history(
             result["failed_symbols"] += 1
             print(f"OHLCV ingestion failed for {symbol}: {exc}", flush=True)
 
-    for index_symbol in ("VNINDEX", "HNXINDEX", "UPCOMINDEX"):
+    for index_symbol in (("VNINDEX", "HNXINDEX", "UPCOMINDEX") if include_indices else ()):
         try:
             frame = await call_with_retry(provider.get_index_history, index_symbol, start, end, limiter=limiter)
             if frame is None or frame.empty:

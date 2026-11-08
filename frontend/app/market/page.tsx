@@ -9,7 +9,7 @@ import { ExplainPanel } from '@/components/ai/ExplainPanel'
 import { ChatWidget } from '@/components/ai/ChatWidget'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { Panel, PageHeader, Change, Segmented, EmptyState } from '@/components/fs'
-import { getScreenerUniverse, getMarketCommentary, getMarketDataStatus } from '@/lib/api'
+import { getMarketBoard, getMarketCommentary, getMarketDataStatus } from '@/lib/api'
 import { fmtPrice, fmtCompact } from '@/lib/format'
 import type {
   ScreenerStock,
@@ -43,11 +43,15 @@ function matchChange(pct: number | null, f: ChangeFilter): boolean {
   return true
 }
 
+function searchKey(value: string): string {
+  return value.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/đ/g, 'd')
+}
+
 // ── Sort ──────────────────────────────────────────────────────
 
 type SortKey = keyof Pick<
   ScreenerStock,
-  'symbol' | 'exchange' | 'sector' | 'current_price' | 'price_change' | 'percent_change' | 'volume'
+  'symbol' | 'exchange' | 'sector' | 'current_price' | 'reference_price' | 'price_change' | 'percent_change' | 'volume'
   | 'trading_value' | 'market_cap' | 'pe' | 'pb'
 >
 type SortDir = 'asc' | 'desc'
@@ -73,6 +77,7 @@ const COLUMNS: ColDef[] = [
   { key: 'sector',         label: 'Ngành',    align: 'left',  show: 'hidden md:table-cell' },
   { key: 'exchange',       label: 'Sàn',      align: 'left',  show: 'hidden sm:table-cell' },
   { key: 'current_price',  label: 'Giá',      align: 'right', show: '' },
+  { key: 'reference_price', label: 'TC',       align: 'right', show: 'hidden md:table-cell' },
   { key: 'percent_change', label: '%',        align: 'right', show: '' },
   { key: 'trading_value',  label: 'GTGD',     align: 'right', show: 'hidden md:table-cell' },
   { key: 'market_cap',     label: 'Vốn hoá',  align: 'right', show: 'hidden lg:table-cell' },
@@ -117,6 +122,9 @@ export default function MarketPage() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [syntheticData, setSyntheticData] = useState(false)
   const [dataSource, setDataSource] = useState<string | null>(null)
+  const [snapshotAt, setSnapshotAt] = useState<string | null>(null)
+  const [quoteSource, setQuoteSource] = useState<string | null>(null)
+  const [boardStatus, setBoardStatus] = useState<'current' | 'stale' | 'no_data'>('no_data')
   const [coverage, setCoverage] = useState<{ listed: number; withHistory: number } | null>(null)
   const [visibleCount, setVisibleCount] = useState(100)
   const requestId = useRef(0)
@@ -141,7 +149,7 @@ export default function MarketPage() {
     const queryExchange = params.get('exchange')
     const queryChange = params.get('change') as ChangeFilter | null
     const querySort = params.get('sort') as SortKey | null
-    const validSorts: SortKey[] = ['symbol', 'exchange', 'sector', 'current_price', 'price_change', 'percent_change', 'volume', 'trading_value', 'market_cap', 'pe', 'pb']
+    const validSorts: SortKey[] = ['symbol', 'exchange', 'sector', 'current_price', 'reference_price', 'price_change', 'percent_change', 'volume', 'trading_value', 'market_cap', 'pe', 'pb']
     if (EXCHANGES.includes(queryExchange as ExchangeFilter)) setExchange(queryExchange as ExchangeFilter)
     if (params.has('sector')) setSector(params.get('sector') || 'Tất cả')
     if (queryChange && CHANGE_OPTS.some((option) => option.key === queryChange)) setChangeFilter(queryChange)
@@ -164,50 +172,60 @@ export default function MarketPage() {
     window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
   }, [filtersReady, symbolQuery, exchange, sector, changeFilter, sortKey, sortDir])
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     const currentRequest = ++requestId.current
-    setLoading(true)
-    setError(null)
-    try {
-      const [screenerRes, commentaryRes, statusRes] = await Promise.allSettled([
-        getScreenerUniverse(symbolQuery.trim() || undefined),
-        getMarketCommentary(),
-        getMarketDataStatus(),
-      ])
-      if (currentRequest !== requestId.current) return
-      if (screenerRes.status === 'fulfilled') {
-        setStocks(screenerRes.value.stocks)
-        setVisibleCount(100)
-        setSyntheticData(screenerRes.value.data_mode === 'synthetic-demo')
-        setDataSource(screenerRes.value.source ?? null)
-      } else {
-        setError('Không tải được dữ liệu thị trường. Vui lòng thử lại.')
-      }
-      if (statusRes.status === 'fulfilled' && statusRes.value.symbolCoverage)
-        setCoverage(statusRes.value.symbolCoverage)
-      if (commentaryRes.status === 'fulfilled' && commentaryRes.value) {
-        const d = commentaryRes.value
-        if (d.breadth) setBreadth(d.breadth)
-        if (d.leading_sectors || d.weak_sectors)
-          setSectors({
-            updated_at: d.updated_at,
-            leading: d.leading_sectors ?? [],
-            weak:    d.weak_sectors    ?? [],
-          })
-      }
-      if (screenerRes.status === 'fulfilled' && screenerRes.value.updated_at) {
-        const dataDate = new Date(screenerRes.value.updated_at)
-        if (!Number.isNaN(dataDate.getTime())) setLastUpdated(screenerRes.value.updated_at)
-      }
-    } finally {
-      if (currentRequest === requestId.current) setLoading(false)
+    if (!silent) {
+      setLoading(true)
+      setError(null)
     }
-  }, [symbolQuery])
+    const auxiliary = Promise.allSettled([getMarketCommentary(), getMarketDataStatus()])
+    try {
+      const board = await getMarketBoard()
+      if (currentRequest !== requestId.current) return
+      setStocks(board.stocks)
+      if (!silent) setVisibleCount(100)
+      setSyntheticData(board.data_mode === 'synthetic-demo')
+      setDataSource(board.source)
+      setSnapshotAt(board.snapshot_at)
+      setQuoteSource(board.quote_source)
+      setBoardStatus(board.status)
+    } catch {
+      if (!silent && currentRequest === requestId.current)
+        setError('Không tải được bảng giá. Vui lòng thử lại.')
+    } finally {
+      if (!silent && currentRequest === requestId.current) setLoading(false)
+    }
+    const [commentaryRes, statusRes] = await auxiliary
+    if (currentRequest !== requestId.current) return
+    if (statusRes.status === 'fulfilled') {
+      if (statusRes.value.symbolCoverage) setCoverage(statusRes.value.symbolCoverage)
+      setLastUpdated(statusRes.value.priceAsOf)
+    }
+    if (commentaryRes.status === 'fulfilled' && commentaryRes.value) {
+      const d = commentaryRes.value
+      if (d.breadth) setBreadth(d.breadth)
+      if (d.leading_sectors || d.weak_sectors)
+        setSectors({ updated_at: d.updated_at, leading: d.leading_sectors ?? [], weak: d.weak_sectors ?? [] })
+    }
+  }, [])
 
   useEffect(() => {
     if (!filtersReady) return
     const timer = window.setTimeout(() => { void fetchData() }, 250)
     return () => window.clearTimeout(timer)
+  }, [fetchData, filtersReady])
+
+  useEffect(() => {
+    if (!filtersReady) return
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void fetchData(true)
+    }
+    const timer = window.setInterval(refresh, 5 * 60 * 1000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
   }, [fetchData, filtersReady])
 
   const toggleSort = (key: SortKey) => {
@@ -233,6 +251,8 @@ export default function MarketPage() {
 
   const displayed = useMemo(() => {
     let list = [...stocks]
+    const query = searchKey(symbolQuery.trim())
+    if (query) list = list.filter((s) => searchKey(`${s.symbol} ${s.name ?? ''}`).includes(query))
     if (exchange !== 'Tất cả')  list = list.filter((s) => s.exchange === exchange)
     if (sector  !== 'Tất cả')   list = list.filter((s) => s.sector   === sector)
     if (changeFilter !== 'all') list = list.filter((s) => matchChange(s.percent_change, changeFilter))
@@ -246,7 +266,7 @@ export default function MarketPage() {
         : (bv as number) - (av as number)
     })
     return list
-  }, [stocks, exchange, sector, changeFilter, sortKey, sortDir])
+  }, [stocks, symbolQuery, exchange, sector, changeFilter, sortKey, sortDir])
 
   const counts = useMemo(() => {
     let up = 0, down = 0, flat = 0
@@ -262,6 +282,24 @@ export default function MarketPage() {
 
   const filtersActive = exchange !== 'Tất cả' || sector !== 'Tất cả' || changeFilter !== 'all' || symbolQuery.trim() !== ''
   const visibleStocks = displayed.slice(0, visibleCount)
+  const quotedCount = useMemo(() => stocks.filter((stock) => stock.current_price != null).length, [stocks])
+  const pricedDisplayed = useMemo(() => displayed.filter((stock) => stock.current_price != null).length, [displayed])
+  const showTradingValue = stocks.some((stock) => stock.trading_value != null)
+  const showReferencePrice = stocks.some((stock) => stock.reference_price != null)
+  const showMarketCap = stocks.some((stock) => stock.market_cap != null)
+  const showPe = stocks.some((stock) => stock.pe != null)
+  const showPb = stocks.some((stock) => stock.pb != null)
+  const visibleColumns = COLUMNS.filter((column) => {
+    if (column.key === 'reference_price') return showReferencePrice
+    if (column.key === 'trading_value') return showTradingValue
+    if (column.key === 'market_cap') return showMarketCap
+    if (column.key === 'pe') return showPe
+    if (column.key === 'pb') return showPb
+    return true
+  })
+  const snapshotNote = snapshotAt
+    ? `${boardStatus === 'stale' ? 'Ảnh chụp cũ' : 'Bảng giá'} ${quoteSource?.toUpperCase() ?? 'Vnstock'} lấy lúc ${new Date(snapshotAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' })}; có thể trễ.`
+    : undefined
 
   return (
     <>
@@ -272,6 +310,7 @@ export default function MarketPage() {
             dataMode={syntheticData ? 'synthetic-demo' : lastUpdated ? 'market-provider' : null}
             asOf={lastUpdated}
             source={dataSource}
+            note={snapshotNote}
             actions={
               <button
                 type="button"
@@ -292,11 +331,15 @@ export default function MarketPage() {
             </div>
           )}
 
+          {!loading && !error && boardStatus === 'no_data' && !syntheticData && (
+            <p className="mt-4 text-[13px] text-[var(--fs-muted)]">Đang chờ ảnh chụp bảng giá đầu tiên.</p>
+          )}
+
           <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-4">
             <div className="min-w-0 xl:col-span-3">
               <Panel
                 title="Danh sách cổ phiếu"
-                aside={!loading ? <span className="tabular-nums">{displayed.length} mã đang lọc</span> : undefined}
+                aside={!loading ? <span className="tabular-nums">{displayed.length.toLocaleString('vi-VN')} mã đang lọc</span> : undefined}
               >
                 {/* Thanh lọc */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-3 border-b border-[var(--fs-line)] px-5 py-3">
@@ -338,8 +381,9 @@ export default function MarketPage() {
                 {/* Dải thống kê */}
                 {!loading && (
                   <p className="border-b border-[var(--fs-line)] px-5 py-2.5 text-[13px] text-[var(--fs-muted)]">
-                    {coverage && <span className="block">Đã có giá cho {coverage.withHistory.toLocaleString('vi-VN')} / {coverage.listed.toLocaleString('vi-VN')} mã niêm yết.</span>}
-                    Trong {displayed.length} mã đang lọc:{' '}
+                    <span className="block">Bảng giá: {quotedCount.toLocaleString('vi-VN')} / {stocks.length.toLocaleString('vi-VN')} mã có giá khớp.</span>
+                    {coverage && <span className="block">Lịch sử giá: {coverage.withHistory.toLocaleString('vi-VN')} / {coverage.listed.toLocaleString('vi-VN')} mã đã tải.</span>}
+                    Trong {pricedDisplayed.toLocaleString('vi-VN')} mã có giá đang lọc:{' '}
                     <span className="tabular-nums" style={{ color: 'var(--fs-up)' }}>{counts.up} tăng</span>,{' '}
                     <span className="tabular-nums" style={{ color: 'var(--fs-flat)' }}>{counts.flat} đứng</span>,{' '}
                     <span className="tabular-nums" style={{ color: 'var(--fs-down)' }}>{counts.down} giảm</span>.
@@ -356,10 +400,11 @@ export default function MarketPage() {
                   <table className="w-full border-collapse text-left text-[14px]">
                     <thead>
                       <tr className="border-b border-[var(--fs-line)] text-[12px] text-[var(--fs-muted)]">
-                        {COLUMNS.map((col) => (
+                        {visibleColumns.map((col) => (
                           <th
                             key={col.key}
                             scope="col"
+                            title={col.key === 'reference_price' ? 'Giá tham chiếu' : undefined}
                             aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                             className={`px-3 py-2 font-normal first:pl-5 last:pr-5 ${col.align === 'right' ? 'text-right' : 'text-left'} ${col.show}`}
                           >
@@ -388,11 +433,12 @@ export default function MarketPage() {
                             <td className="hidden max-w-[160px] truncate px-3 py-2.5 text-[13px] text-[var(--fs-ink-2)] md:table-cell">{stock.sector || '–'}</td>
                             <td className="hidden px-3 py-2.5 text-[13px] text-[var(--fs-ink-2)] sm:table-cell">{stock.exchange}</td>
                             <td className="px-3 py-2.5 text-right tabular-nums">{fmtPrice(stock.current_price, 0)}</td>
+                            {showReferencePrice && <td className="hidden px-3 py-2.5 text-right tabular-nums text-[var(--fs-flat)] md:table-cell">{fmtPrice(stock.reference_price, 0)}</td>}
                             <td className="px-3 py-2.5 text-right"><Change value={stock.percent_change} /></td>
-                            <td className="hidden px-3 py-2.5 text-right tabular-nums md:table-cell">{fmtCompact(stock.trading_value)}</td>
-                            <td className="hidden px-3 py-2.5 text-right tabular-nums lg:table-cell">{fmtCompact(stock.market_cap)}</td>
-                            <td className="hidden px-3 py-2.5 text-right tabular-nums lg:table-cell">{fmtPrice(stock.pe, 1)}</td>
-                            <td className="hidden px-3 py-2.5 pr-5 text-right tabular-nums lg:table-cell">{fmtPrice(stock.pb, 1)}</td>
+                            {showTradingValue && <td className="hidden px-3 py-2.5 text-right tabular-nums md:table-cell">{fmtCompact(stock.trading_value)}</td>}
+                            {showMarketCap && <td className="hidden px-3 py-2.5 text-right tabular-nums lg:table-cell">{fmtCompact(stock.market_cap)}</td>}
+                            {showPe && <td className="hidden px-3 py-2.5 text-right tabular-nums lg:table-cell">{fmtPrice(stock.pe, 1)}</td>}
+                            {showPb && <td className="hidden px-3 py-2.5 pr-5 text-right tabular-nums lg:table-cell">{fmtPrice(stock.pb, 1)}</td>}
                           </tr>
                         ))
                       )}
