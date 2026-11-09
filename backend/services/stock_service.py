@@ -1046,10 +1046,10 @@ def get_data_sources() -> dict:
         },
         "history": "Configured provider daily OHLCV; vnstock v5 uses Market.equity().ohlcv()",
         "news": "RSS feeds from VnExpress and VnEconomy by default",
-        "ai_enabled": bool(settings.openrouter_api_key),
+        "ai_enabled": bool(settings.openrouter_api_key or settings.gemini_api_key),
         "ai": {
-            "commentary": "OpenRouter if OPENROUTER_API_KEY is set, otherwise deterministic fallback",
-            "chat": "OpenRouter if OPENROUTER_API_KEY is set, otherwise deterministic fallback",
+            "commentary": "Gemini direct if GEMINI_API_KEY is set; otherwise OpenRouter; otherwise deterministic fallback",
+            "chat": "Gemini direct if GEMINI_API_KEY is set; otherwise OpenRouter; otherwise deterministic fallback",
         },
         "fallbacks": [
             "Cached market snapshots to reduce repeated market fetches",

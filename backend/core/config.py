@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     openrouter_api_key: str | None = None
     openrouter_model: str = "deepseek/deepseek-chat-v3.1"
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
     jwt_secret: str = "local-development-only-change-before-deploy"
     vnstock_api_key: str | None = None
     vnstock_symbols: str = "ALL"

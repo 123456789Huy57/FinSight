@@ -17,6 +17,7 @@ from providers.factory import get_configured_market_source_id
 from services.stock_service import SECTOR_MAP
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
 async def _load_price_bars(symbol: str, limit: int = 252) -> list[PriceBar]:
@@ -387,7 +388,35 @@ def _quick_price_response(question: str, context: Dict[str, Any] | None = None) 
     return f"{direct} {ta} {fa} {watch}"
 
 
+def _call_gemini(messages: list[dict[str, str]]) -> str:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    system = next((message["content"] for message in messages if message["role"] == "system"), None)
+    contents = [
+        {"role": "model" if message["role"] == "assistant" else "user",
+         "parts": [{"text": message["content"]}]}
+        for message in messages if message["role"] != "system"
+    ]
+    payload: dict[str, Any] = {"contents": contents}
+    if system:
+        payload["systemInstruction"] = {"parts": [{"text": system}]}
+    response = requests.post(
+        GEMINI_URL.format(model=model),
+        params={"key": api_key},
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(payload),
+        timeout=45,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return data["candidates"][0]["content"]["parts"][0]["text"]
+
+
 def _call_openrouter(messages: list[dict[str, str]]) -> str:
+    if os.getenv("GEMINI_API_KEY"):
+        return _call_gemini(messages)
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
