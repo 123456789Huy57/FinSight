@@ -7,6 +7,8 @@
 - Cần chạy backfill nhóm mã ưu tiên trước khi gọi dữ liệu “đủ dùng”.
 - Bảng thị trường có chế độ `quality=ready`: chỉ trả mã có ít nhất 30 phiên lịch sử và có bar đến ngày VN-Index mới nhất; frontend dùng chế độ này thay vì hiển thị toàn bộ mã thiếu dữ liệu.
 - Tin tức bổ sung hai câu “Có thể ảnh hưởng” và “Đã quan sát”; phần sau chỉ nói có phản ứng khi event study đã đo được, không suy luận nhân quả.
+- Panel Explain dùng token tối cũ trên nền sáng nên chữ tương phản thấp; đã đổi sang token `--fs-*` của giao diện sáng và bỏ opacity làm mờ bản xem trước.
+- Explain hiện gọi OpenRouter qua `OPENROUTER_API_KEY`; không gọi Gemini trực tiếp. `OPENROUTER_MODEL` quyết định model, mặc định là `deepseek/deepseek-chat-v3.1`.
 
 ## BE-DEPLOY-DEBUG — sửa lỗi gọi daily sync trong GitHub Actions
 - Lần chạy workflow #5 đã qua bước `Apply migrations`; lỗi còn lại là `ModuleNotFoundError: No module named 'core'` do chạy file `scripts/daily_sync.py` trực tiếp khiến Python chỉ đặt thư mục `scripts` vào import path.

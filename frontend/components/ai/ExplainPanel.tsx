@@ -86,11 +86,11 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--fs-signal)]/[0.12] bg-[var(--fs-paper)] flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary" />
+            <div className="w-8 h-8 rounded-lg bg-[var(--fs-signal-soft)] border border-[var(--fs-signal)]/20 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-[var(--fs-signal)]" />
             </div>
             <div>
-              <h2 className="text-[13px] font-bold text-foreground">FinSight</h2>
+              <h2 className="text-[13px] font-bold text-[var(--fs-ink)]">FinSight</h2>
               <p className="text-[11px] text-[var(--fs-muted)] font-medium mt-0.5 truncate max-w-[280px]">
                 {request?.title ?? 'Phân tích'}
               </p>
@@ -98,7 +98,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--fs-muted)] hover:bg-[var(--fs-surface)] hover:text-foreground transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--fs-muted)] hover:bg-[var(--fs-surface)] hover:text-[var(--fs-ink)] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -110,15 +110,15 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
           {/* Loading state */}
           {loading && (
             <div className="flex flex-col items-center justify-center py-16 space-y-3">
-              <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              <p className="text-sm font-bold text-primary">Đang phân tích...</p>
+              <Loader2 className="w-8 h-8 text-[var(--fs-signal)] animate-spin" />
+              <p className="text-sm font-bold text-[var(--fs-signal)]">Đang phân tích...</p>
               <p className="text-xs text-[var(--fs-muted)]">Tổng hợp dữ liệu kỹ thuật và cơ bản</p>
             </div>
           )}
 
           {/* Preview while loading */}
           {loading && fallback && (
-            <div className="rounded-2xl border border-[var(--fs-signal)]/[0.15] bg-[var(--fs-paper)] p-4 opacity-40">
+            <div className="rounded-2xl border border-[var(--fs-signal)]/[0.15] bg-[var(--fs-paper)] p-4">
               <p className="text-xs text-[var(--fs-muted)] italic">{fallback.summary}</p>
             </div>
           )}
@@ -127,12 +127,12 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
           {!loading && active && (
             <div className="space-y-3">
               {/* Summary */}
-              <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-4">
+              <div className="rounded-xl border border-[var(--fs-signal)]/20 bg-[var(--fs-signal-soft)] p-4">
                 <div className="flex items-center gap-2 mb-2.5">
-                  <BookOpen className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Nhận định</span>
+                  <BookOpen className="w-3.5 h-3.5 text-[var(--fs-signal)]" />
+                  <span className="text-[10px] font-bold text-[var(--fs-signal)] uppercase tracking-wider">Nhận định</span>
                 </div>
-                <p className="text-[13px] font-semibold text-foreground leading-relaxed">{active.summary}</p>
+                <p className="text-[13px] font-semibold text-[var(--fs-ink)] leading-relaxed">{active.summary}</p>
               </div>
 
               {/* Live snapshot */}
@@ -146,7 +146,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
                     {Object.entries(request.snapshot).map(([k, v]) => (
                       <div key={k} className="flex justify-between gap-2 text-xs border-b border-[var(--fs-line)] pb-1.5">
                         <span className="text-[var(--fs-muted)]">{SNAPSHOT_LABELS[k] ?? k.replace(/_/g, ' ')}</span>
-                        <span className="font-semibold text-foreground">{fmt(v)}</span>
+                        <span className="font-semibold text-[var(--fs-ink)]">{fmt(v)}</span>
                       </div>
                     ))}
                   </div>
@@ -171,7 +171,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
                     ].map(([label, val]) => val !== null && val !== undefined ? (
                       <div key={label as string} className="flex justify-between border-b border-[var(--fs-line)] pb-1">
                         <span className="text-[var(--fs-muted)]">{label as string}</span>
-                        <span className="font-semibold text-foreground">{fmt(val)}</span>
+                        <span className="font-semibold text-[var(--fs-ink)]">{fmt(val)}</span>
                       </div>
                     ) : null)}
                   </div>
@@ -186,11 +186,11 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
                     <span className="text-[10px] font-bold text-[var(--fs-up)] uppercase tracking-wider">Cơ bản</span>
                   </div>
                   <p className="text-xs text-[var(--fs-muted)] mb-1">
-                    <span className="font-semibold text-foreground">Ngành: </span>
+                    <span className="font-semibold text-[var(--fs-ink)]">Ngành: </span>
                     {active.fundamental_snapshot.sector ?? 'N/A'}
                   </p>
                   {active.fundamental_snapshot.read && (
-                    <p className="text-xs text-foreground leading-relaxed">{active.fundamental_snapshot.read}</p>
+                    <p className="text-xs text-[var(--fs-ink)] leading-relaxed">{active.fundamental_snapshot.read}</p>
                   )}
                 </div>
               )}
@@ -204,7 +204,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
                   </div>
                   <ul className="space-y-2">
                     {active.key_drivers.map((item, i) => (
-                      <li key={i} className="flex gap-2.5 text-xs text-foreground leading-relaxed">
+                      <li key={i} className="flex gap-2.5 text-xs text-[var(--fs-ink)] leading-relaxed">
                         <span className="text-[var(--fs-signal)] font-black mt-0.5 flex-shrink-0">→</span>
                         {item}
                       </li>
@@ -222,7 +222,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
                   </div>
                   <ul className="space-y-2">
                     {active.bullish_factors.map((item, i) => (
-                      <li key={i} className="flex gap-2.5 text-xs text-foreground leading-relaxed">
+                      <li key={i} className="flex gap-2.5 text-xs text-[var(--fs-ink)] leading-relaxed">
                         <span className="text-[var(--fs-up)] font-black mt-0.5 flex-shrink-0">+</span>
                         {item}
                       </li>
@@ -240,7 +240,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
                   </div>
                   <ul className="space-y-2">
                     {active.risk_factors.map((item, i) => (
-                      <li key={i} className="flex gap-2.5 text-xs text-foreground leading-relaxed">
+                      <li key={i} className="flex gap-2.5 text-xs text-[var(--fs-ink)] leading-relaxed">
                         <span className="text-[var(--fs-down)] font-black mt-0.5 flex-shrink-0">-</span>
                         {item}
                       </li>
@@ -258,7 +258,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
                   </div>
                   <ul className="space-y-2">
                     {active.watch_next.map((item, i) => (
-                      <li key={i} className="flex gap-2.5 text-xs text-foreground leading-relaxed">
+                      <li key={i} className="flex gap-2.5 text-xs text-[var(--fs-ink)] leading-relaxed">
                         <span className="text-[var(--fs-ink-2)] font-black mt-0.5 flex-shrink-0">◎</span>
                         {item}
                       </li>
