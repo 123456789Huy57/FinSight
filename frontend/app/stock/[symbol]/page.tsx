@@ -418,7 +418,14 @@ export default function StockPage({ params }: Props) {
                     ))}
                   </div>
                 ) : quote ? (
-                  <dl>
+                  <>
+                    <p className="border-b border-[var(--fs-line)] py-3 text-[14px] leading-6 text-[var(--fs-ink-2)]">
+                      {profile?.description
+                        ?? (profile?.sector
+                          ? `${profile.company_name ?? SYM} hoạt động trong nhóm ${profile.sector}. Hồ sơ chi tiết chưa được cập nhật từ nguồn dữ liệu hiện tại.`
+                          : 'Chưa có mô tả doanh nghiệp từ nguồn dữ liệu hiện tại.')}
+                    </p>
+                    <dl>
                     <Row label={quote.quote_source === 'vci-eod' ? 'Giá cuối ngày' : quote.quote_source ? 'Giá khớp' : 'Giá hiện tại'}>{valueOrNoData(quote.current_price, (n) => fmtPriceVi(n, 0))}</Row>
                     {quote.reference_price != null && <Row label="Giá tham chiếu">{fmtPriceVi(quote.reference_price, 0)}</Row>}
                     <Row label="Thay đổi">{valueOrNoData(quote.price_change, (n) => fmtPriceVi(n, 0))}</Row>
@@ -426,7 +433,8 @@ export default function StockPage({ params }: Props) {
                     <Row label="Khối lượng">{valueOrNoData(quote.volume, (n) => fmtVol(n))}</Row>
                     <Row label="Sàn">{quote.exchange}</Row>
                     {sector && <Row label="Ngành">{sector}</Row>}
-                  </dl>
+                    </dl>
+                  </>
                 ) : (
                   <p className="py-3 text-[14px] text-[var(--fs-muted)]">{NO_DATA}</p>
                 )}

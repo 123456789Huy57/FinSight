@@ -81,6 +81,13 @@ def test_news_classification_and_ticker_linking_fold_accents() -> None:
     assert _related_symbols("Công bố kết quả tại Hòa Phát", [("HPG", "Công ty Cổ phần Tập đoàn Hòa Phát")]) == ["HPG"]
 
 
+def test_related_symbols_ignores_common_non_stock_tokens():
+    assert _related_symbols(
+        "Định giá 2.000 tỷ USD, quỹ ETF theo dõi FTSE.",
+        [("USD", "United States Dollar"), ("ETF", "Quỹ ETF"), ("FTSE", "FTSE Russell")],
+    ) == []
+
+
 def test_news_ingestion_and_api_are_disabled_without_rights_opt_in(monkeypatch) -> None:
     monkeypatch.setattr(settings, "news_feed_enabled", False)
     assert settings.news_feed_enabled is False

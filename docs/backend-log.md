@@ -1,5 +1,11 @@
 # Backend task log
 
+## FIREANT-MVP-01 — làm sạch liên kết tin và mô tả mã
+- Kiểm tra production cho thấy bài viết có thể bị gắn mã phổ thông như `USD`, `ETF`, `FTSE`; đây là token tài chính, không phải mã cổ phiếu cần liên kết.
+- Bỏ các token phổ thông khỏi liên kết tin và thêm test hồi quy; không xoá dữ liệu lịch sử đã lưu.
+- Trang mã hiển thị mô tả tiếng Việt rõ ràng dựa trên ngành đã có, đồng thời nói thẳng khi hồ sơ chi tiết chưa được cung cấp; không bịa fundamentals.
+- Cần chạy backfill nhóm mã ưu tiên trước khi gọi dữ liệu “đủ dùng”.
+
 ## BE-DEPLOY-DEBUG — sửa lỗi gọi daily sync trong GitHub Actions
 - Lần chạy workflow #5 đã qua bước `Apply migrations`; lỗi còn lại là `ModuleNotFoundError: No module named 'core'` do chạy file `scripts/daily_sync.py` trực tiếp khiến Python chỉ đặt thư mục `scripts` vào import path.
 - Sửa workflow đặt `PYTHONPATH` về thư mục `backend` và gọi script như module `python -m scripts.daily_sync`; không thay đổi logic đồng bộ hoặc secret.

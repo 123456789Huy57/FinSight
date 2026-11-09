@@ -21,6 +21,10 @@ CATEGORY_RULES = {
     "stock": ("cổ phiếu", "doanh nghiệp", "công ty", "kết quả kinh doanh", "cổ đông"),
 }
 
+GENERIC_TICKER_TOKENS = {
+    "USD", "EUR", "GDP", "ETF", "FED", "FTSE", "PMP", "PMW",
+}
+
 
 def _category(text: str) -> str:
     normalized = normalize_vi(text)
@@ -36,6 +40,8 @@ def _related_symbols(text: str, symbols: list[tuple[str, str | None]]) -> list[s
     normalized_text = normalize_vi(text)
     generic_name_suffixes = {"viet nam", "tai chinh", "ngan hang", "thuong mai"}
     for code, name in symbols:
+        if code.upper() in GENERIC_TICKER_TOKENS:
+            continue
         if re.search(rf"(?<![A-Z0-9]){re.escape(code)}(?![A-Z0-9])", upper_text):
             found.append(code)
             continue
