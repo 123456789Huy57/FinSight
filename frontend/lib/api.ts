@@ -217,6 +217,9 @@ export type NewsItem = {
   sentimentScore?: number
   sentimentMethod?: string
   reactions?: NewsReaction[]
+  possibleImpact?: string
+  observedImpact?: string
+  impactConfidence?: 'measured' | 'insufficient_data' | 'pending'
 }
 
 export type EventWindow = {
@@ -532,7 +535,7 @@ export type MarketBoardResponse = {
   status: 'current' | 'stale' | 'no_data'
 }
 
-export const getMarketBoard = async (): Promise<MarketBoardResponse> => {
+export const getMarketBoard = async (options: { quality?: 'ready' } = {}): Promise<MarketBoardResponse> => {
   const response = await get<{
     items: Array<{ symbol: string; name: string | null; exchange: string | null; sector: string | null;
       price: number | null; referencePrice?: number | null; change: number | null;
@@ -543,7 +546,7 @@ export const getMarketBoard = async (): Promise<MarketBoardResponse> => {
     quoteSource: string | null
     snapshotAt: string | null
     status: 'current' | 'stale' | 'no_data'
-  }>('/api/v1/market/board')
+  }>(`/api/v1/market/board${options.quality ? '?quality=ready' : ''}`)
   return {
     count: response.total, data_mode: response.dataMode, source: response.source,
     snapshot_at: response.snapshotAt, quote_source: response.quoteSource, status: response.status,
@@ -639,7 +642,7 @@ export const getNewsIntelligence = async (options: NewsQuery = {}): Promise<News
   if (options.symbol) params.set('symbol', options.symbol.toUpperCase())
   params.set('limit', String(Math.min(200, Math.max(1, options.limit ?? 50))))
   params.set('offset', String(Math.max(0, options.offset ?? 0)))
-  const response = await get<{ items: Array<{ id: string; headline: string; summary: string | null; source: string; timestamp: string; sentiment: string; sentimentScore: number; sentimentMethod: string; category: string | null; relatedSymbols: string[]; reactions: NewsReaction[]; url: string }>; total: number; limit: number; offset: number; source: string | null; dataMode: DataMode | null; asOf: string | null; status: 'disabled' | 'available' | 'no_data' }>(`/api/v1/news?${params.toString()}`)
+  const response = await get<{ items: Array<{ id: string; headline: string; summary: string | null; source: string; timestamp: string; sentiment: string; sentimentScore: number; sentimentMethod: string; category: string | null; relatedSymbols: string[]; reactions: NewsReaction[]; url: string; possibleImpact?: string; observedImpact?: string; impactConfidence?: NewsItem['impactConfidence'] }>; total: number; limit: number; offset: number; source: string | null; dataMode: DataMode | null; asOf: string | null; status: 'disabled' | 'available' | 'no_data' }>(`/api/v1/news?${params.toString()}`)
   const impact: Record<string, string> = { positive: 'Tích cực', negative: 'Tiêu cực', neutral: 'Trung lập' }
   return {
     updated_at: response.asOf ?? response.items[0]?.timestamp ?? '',
@@ -653,7 +656,9 @@ export const getNewsIntelligence = async (options: NewsQuery = {}): Promise<News
     items: response.items.map((item) => ({ id: item.id, headline: item.headline, source: item.source,
       time: item.timestamp, insight: item.summary ?? '', marketImpact: impact[item.sentiment] ?? 'Theo dõi',
       affectedTickers: item.relatedSymbols, url: item.url, category: item.category,
-      sentimentScore: item.sentimentScore, sentimentMethod: item.sentimentMethod, reactions: item.reactions })),
+      sentimentScore: item.sentimentScore, sentimentMethod: item.sentimentMethod, reactions: item.reactions,
+      possibleImpact: item.possibleImpact, observedImpact: item.observedImpact,
+      impactConfidence: item.impactConfidence })),
   }
 }
 export const getDataSources = () => get<DataSourcesResponse>('/api/v1/meta')

@@ -5,6 +5,8 @@
 - Bỏ các token phổ thông khỏi liên kết tin và thêm test hồi quy; không xoá dữ liệu lịch sử đã lưu.
 - Trang mã hiển thị mô tả tiếng Việt rõ ràng dựa trên ngành đã có, đồng thời nói thẳng khi hồ sơ chi tiết chưa được cung cấp; không bịa fundamentals.
 - Cần chạy backfill nhóm mã ưu tiên trước khi gọi dữ liệu “đủ dùng”.
+- Bảng thị trường có chế độ `quality=ready`: chỉ trả mã có ít nhất 30 phiên lịch sử và có bar đến ngày VN-Index mới nhất; frontend dùng chế độ này thay vì hiển thị toàn bộ mã thiếu dữ liệu.
+- Tin tức bổ sung hai câu “Có thể ảnh hưởng” và “Đã quan sát”; phần sau chỉ nói có phản ứng khi event study đã đo được, không suy luận nhân quả.
 
 ## BE-DEPLOY-DEBUG — sửa lỗi gọi daily sync trong GitHub Actions
 - Lần chạy workflow #5 đã qua bước `Apply migrations`; lỗi còn lại là `ModuleNotFoundError: No module named 'core'` do chạy file `scripts/daily_sync.py` trực tiếp khiến Python chỉ đặt thư mục `scripts` vào import path.

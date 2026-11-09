@@ -113,6 +113,12 @@ export function NewsCard({ item, onExplain, focusSymbol }: Props) {
         {item.insight && (
           <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-[var(--fs-ink-2)]">{item.insight}</p>
         )}
+        {item.possibleImpact && (
+          <div className="mt-2 space-y-1 text-[13px] leading-relaxed text-[var(--fs-ink-2)]">
+            <p><strong className="font-medium text-[var(--fs-ink)]">Có thể ảnh hưởng:</strong> {item.possibleImpact}</p>
+            <p><strong className="font-medium text-[var(--fs-ink)]">Đã quan sát:</strong> {item.observedImpact ?? 'Chưa đủ dữ liệu để đánh giá.'}</p>
+          </div>
+        )}
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {item.affectedTickers.slice(0, 4).map((t) => (

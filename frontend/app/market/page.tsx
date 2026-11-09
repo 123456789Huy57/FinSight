@@ -180,7 +180,7 @@ export default function MarketPage() {
     }
     const auxiliary = Promise.allSettled([getMarketCommentary(), getMarketDataStatus()])
     try {
-      const board = await getMarketBoard()
+      const board = await getMarketBoard({ quality: 'ready' })
       if (currentRequest !== requestId.current) return
       setStocks(board.stocks)
       if (!silent) setVisibleCount(100)

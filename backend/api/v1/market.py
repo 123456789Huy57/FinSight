@@ -62,7 +62,7 @@ def _stock_row(symbol: Symbol, bar: PriceBar, previous_close):
 
 
 @router.get("/board")
-async def quote_board():
+async def quote_board(quality: str | None = Query(None, pattern="^ready$")):
     """Serve one persisted market snapshot; browser requests never call the provider."""
     global _fallback_board_cache
     source = get_configured_market_source_id()
@@ -73,13 +73,37 @@ async def quote_board():
                 "dataMode": _configured_data_mode(), "quoteSource": None, "snapshotAt": None,
                 "status": "current" if items else "no_data"}
     async with AsyncSessionLocal() as session:
+        ready_symbols: set[str] | None = None
+        if quality == "ready":
+            latest_index = await session.scalar(
+                select(func.max(IndexBar.trade_date)).where(
+                    IndexBar.source == source, IndexBar.index_symbol == "VNINDEX"
+                )
+            )
+            if latest_index:
+                ready_rows = await session.execute(
+                    select(PriceBar.symbol)
+                    .where(PriceBar.source == source)
+                    .group_by(PriceBar.symbol)
+                    .having(
+                        func.count(PriceBar.trade_date) >= 30,
+                        func.max(PriceBar.trade_date) >= latest_index,
+                    )
+                )
+                ready_symbols = {symbol for (symbol,) in ready_rows.all()}
         snapshot = await session.scalar(
             select(MarketSnapshot).where(MarketSnapshot.payload["source"].as_string() == source)
             .order_by(MarketSnapshot.as_of.desc()).limit(1)
         )
         if snapshot is None:
             if _fallback_board_cache is not None and monotonic() < _fallback_board_cache[0]:
-                return _fallback_board_cache[1]
+                fallback = _fallback_board_cache[1]
+                if ready_symbols is not None:
+                    fallback = {**fallback, "items": [
+                        item for item in fallback["items"] if item["symbol"] in ready_symbols
+                    ]}
+                    fallback["total"] = len(fallback["items"])
+                return fallback
             directory = (await session.execute(
                 select(Symbol.symbol, Symbol.name, Symbol.exchange, Symbol.sector)
                 .where(Symbol.is_active.is_(True), Symbol.exchange.in_(("HOSE", "HNX", "UPCOM")))
@@ -99,6 +123,8 @@ async def quote_board():
                       "volume": daily[code]["volume"] if code in daily else None,
                       "asOf": daily[code]["asOf"] if code in daily else None}
                      for code, name, exchange, sector in directory]
+            if ready_symbols is not None:
+                items = [item for item in items if item["symbol"] in ready_symbols]
             fallback = {"items": items, "total": len(items), "source": source,
                         "dataMode": _configured_data_mode(),
                         "quoteSource": "vci-eod" if daily else None, "snapshotAt": None,
@@ -107,7 +133,10 @@ async def quote_board():
             return fallback
     now = datetime.now(timezone.utc)
     fresh = (now - snapshot.as_of).total_seconds() < 600 or not quote_refresh_due(now, snapshot.as_of)
-    return {"items": snapshot.payload["items"], "total": len(snapshot.payload["items"]),
+    items = snapshot.payload["items"]
+    if ready_symbols is not None:
+        items = [item for item in items if item["symbol"] in ready_symbols]
+    return {"items": items, "total": len(items),
             "source": source, "dataMode": _configured_data_mode(),
             "quoteSource": snapshot.payload.get("quoteSource"),
             "snapshotAt": snapshot.as_of.isoformat(),

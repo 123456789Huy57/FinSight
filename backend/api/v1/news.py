@@ -106,6 +106,25 @@ async def list_news(
             })
         return reactions
 
+    def impact_explanation(article, reactions):
+        possible = {
+            "economic": "Có thể ảnh hưởng đến lãi suất, tỷ giá, chi phí vốn và sức mua.",
+            "regulatory": "Có thể ảnh hưởng đến chi phí tuân thủ, hoạt động và định giá doanh nghiệp.",
+            "stock": "Có thể ảnh hưởng đến doanh thu, lợi nhuận hoặc kỳ vọng của nhà đầu tư.",
+            "market": "Có thể ảnh hưởng đến tâm lý và dòng tiền của một nhóm ngành hoặc toàn thị trường.",
+        }.get(article.category or "market", "Có thể ảnh hưởng đến kỳ vọng và tâm lý thị trường.")
+        measured = [reaction for reaction in reactions if reaction["status"] == "measured"]
+        if measured:
+            observed = "Đã đo được biến động sau tin; đây là tương quan quan sát, không khẳng định tin gây ra biến động."
+            confidence = "measured"
+        elif reactions:
+            observed = "Chưa đủ dữ liệu để đo phản ứng T+1/T+5 của các mã liên quan."
+            confidence = "insufficient_data"
+        else:
+            observed = "Chưa xác định được mã cổ phiếu liên quan để đo phản ứng giá."
+            confidence = "insufficient_data"
+        return possible, observed, confidence
+
     return {
         "items": [{
             "id": article.id,
@@ -120,6 +139,10 @@ async def list_news(
             "relatedSymbols": sorted(related.get(article.id, [])),
             "reactions": reactions_for(article.id),
             "url": article.url,
+            **(lambda reactions: dict(zip(
+                ("possibleImpact", "observedImpact", "impactConfidence"),
+                impact_explanation(article, reactions),
+            )))(reactions_for(article.id)),
         } for article in articles],
         "total": total,
         "limit": limit,
