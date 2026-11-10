@@ -115,7 +115,13 @@ export function NewsCard({ item, onExplain, focusSymbol }: Props) {
         )}
         {item.possibleImpact && (
           <div className="mt-2 space-y-1 text-[13px] leading-relaxed text-[var(--fs-ink-2)]">
-            <p><strong className="font-medium text-[var(--fs-ink)]">Có thể ảnh hưởng:</strong> {item.possibleImpact}</p>
+            <p><strong className="font-medium text-[var(--fs-ink)]">Tác động cụ thể:</strong> {item.possibleImpact}</p>
+            {item.impactDetail && (
+              <p>
+                <strong className="font-medium text-[var(--fs-ink)]">Biến số cần theo dõi:</strong>{' '}
+                {item.impactDetail.driver}. {item.impactDetail.timeframe}
+              </p>
+            )}
             <p><strong className="font-medium text-[var(--fs-ink)]">Đã quan sát:</strong> {item.observedImpact ?? 'Chưa đủ dữ liệu để đánh giá.'}</p>
           </div>
         )}
@@ -129,6 +135,11 @@ export function NewsCard({ item, onExplain, focusSymbol }: Props) {
               <div className="h-full rounded-full bg-[var(--fs-signal)]" style={{ width: `${Math.min(100, Math.max(0, item.forecast.confidence))}%` }} />
             </div>
             <p className="mt-1 text-[11px] text-[var(--fs-muted)]">{item.forecast.basis}</p>
+            {item.forecast.driver && (
+              <p className="mt-1 text-[11px] text-[var(--fs-muted)]">
+                Theo dõi: {item.forecast.driver}
+              </p>
+            )}
           </div>
         )}
 

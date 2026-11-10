@@ -1,5 +1,5 @@
 import services.news_service as news_service
-from api.v1.news import list_news
+from api.v1.news import _impact_profile, list_news
 from core.config import settings
 from jobs.ingest_news import _category, _related_symbols, ingest_news
 import services.stock_service as stock_service
@@ -86,6 +86,29 @@ def test_related_symbols_ignores_common_non_stock_tokens():
         "Định giá 2.000 tỷ USD, quỹ ETF theo dõi FTSE.",
         [("USD", "United States Dollar"), ("ETF", "Quỹ ETF"), ("FTSE", "FTSE Russell")],
     ) == []
+
+
+def test_impact_profile_names_the_transmission_variable() -> None:
+    article = type("Article", (), {
+        "title": "Khung giá điện mặt trời cao nhất hơn 2.120 đồng một kWh",
+        "summary": "Mức giá phát điện tối đa được áp dụng.",
+        "category": "economic",
+    })()
+    profile = _impact_profile(article, [])
+    assert profile["driver"] == "giá bán điện đầu ra"
+    assert "doanh thu" in profile["mechanism"]
+    assert "gắn theo từ khoá" in profile["caveat"]
+
+
+def test_impact_profile_does_not_invent_a_vietnamese_ticker() -> None:
+    article = type("Article", (), {
+        "title": "Cổ phiếu Nvidia lao dốc sau bê bối ngoại tình",
+        "summary": "Cổ phiếu Nvidia giảm hơn 6%.",
+        "category": "stock",
+    })()
+    profile = _impact_profile(article, [])
+    assert profile["affected"] == []
+    assert "chưa thể suy ra" in profile["caveat"].lower()
 
 
 def test_news_ingestion_and_api_are_disabled_without_rights_opt_in(monkeypatch) -> None:

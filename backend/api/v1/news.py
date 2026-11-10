@@ -2,11 +2,93 @@ from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
 from core.config import settings
-from db.models import NewsArticle, NewsEventStudy, NewsSymbol
+from db.models import NewsArticle, NewsEventStudy, NewsSymbol, Symbol
 from db.session import AsyncSessionLocal
 from domain.text import normalize_vi
 
 router = APIRouter(prefix="/api/v1/news", tags=["v1 news"])
+
+
+def _impact_profile(article, symbols: list[str]) -> dict:
+    text = normalize_vi(f"{article.title} {article.summary or ''}")
+    profiles = (
+        (
+            ("dien mat troi", "gia phat dien", "dien mat"),
+            "giá bán điện đầu ra",
+            "Giá bán điện cao hơn có thể cải thiện doanh thu và biên lợi nhuận của nhà máy phát điện.",
+            "Tích cực với doanh nghiệp phát điện liên quan; chưa kết luận nếu mã chỉ được gắn theo từ khoá.",
+        ),
+        (
+            ("lai suat", "mat bang lai suat"),
+            "chi phí vốn và biên lãi",
+            "Lãi suất thay đổi tác động trực tiếp đến chi phí vay của doanh nghiệp và biên lãi của ngân hàng.",
+            "Lãi suất giảm thường hỗ trợ nhóm vay nhiều và định giá cổ phiếu; chiều ngược lại gây áp lực.",
+        ),
+        (
+            ("ty gia", "usd", "ngoai te"),
+            "tỷ giá và doanh thu ngoại tệ",
+            "Tỷ giá thay đổi làm đổi giá trị doanh thu xuất khẩu và chi phí nhập khẩu khi quy đổi sang đồng.",
+            "Doanh nghiệp xuất khẩu và nhập khẩu có thể chịu tác động trái chiều.",
+        ),
+        (
+            ("dau tho", "gia dau", "xang dau"),
+            "giá nguyên liệu đầu vào",
+            "Giá dầu thay đổi làm đổi chi phí nhiên liệu, vận tải và biên lợi nhuận của các ngành sử dụng dầu.",
+            "Tác động tích cực hay tiêu cực phụ thuộc doanh nghiệp là bên bán hay bên sử dụng đầu vào.",
+        ),
+        (
+            ("ket qua kinh doanh", "loi nhuan", "doanh thu", "co dong"),
+            "doanh thu và lợi nhuận kỳ báo cáo",
+            "Thông tin này thay đổi kỳ vọng về doanh thu, lợi nhuận và định giá của doanh nghiệp.",
+            "Cần đối chiếu với số liệu kỳ trước và kỳ vọng thị trường trước khi kết luận chiều tác động.",
+        ),
+        (
+            ("nvidia", "chip", "ban dan", "ai"),
+            "nhu cầu chip và chi tiêu hạ tầng công nghệ",
+            "Tin này chủ yếu tác động đến kỳ vọng ngành chip và chi tiêu hạ tầng công nghệ toàn cầu.",
+            "Chưa thể suy ra tác động lên mã Việt Nam nếu bài viết chưa gắn với doanh nghiệp cụ thể.",
+        ),
+    )
+    for terms, driver, mechanism, caveat in profiles:
+        if any(term in text for term in terms):
+            affected = (
+                [{"symbol": symbol, "role": "mã được bài viết liên kết", "direction": "cần xác nhận"} for symbol in symbols]
+                if symbols else []
+            )
+            return {
+                "driver": driver,
+                "mechanism": mechanism,
+                "affected": affected,
+                "caveat": caveat,
+                "timeframe": "Giá có thể phản ứng trong T+1 đến T+5; tác động kết quả kinh doanh cần theo dõi kỳ báo cáo.",
+            }
+
+    category_profiles = {
+        "economic": (
+            "chính sách vĩ mô và chi phí vốn",
+            "Tin có thể thay đổi chi phí vốn, sức mua hoặc tỷ giá, từ đó ảnh hưởng khác nhau theo ngành.",
+        ),
+        "regulatory": (
+            "chi phí tuân thủ và quyền kinh doanh",
+            "Quy định mới có thể làm đổi chi phí tuân thủ, sản lượng được phép hoặc thời gian cấp phép.",
+        ),
+        "stock": (
+            "kỳ vọng doanh thu và lợi nhuận",
+            "Thông tin doanh nghiệp thường được thị trường phản ánh qua kỳ vọng doanh thu, lợi nhuận và dòng tiền.",
+        ),
+        "market": (
+            "tâm lý và dòng tiền thị trường",
+            "Tin chỉ tạo tác động trực tiếp khi có kênh truyền dẫn rõ; nếu không, phản ứng thường thể hiện qua tâm lý và dòng tiền.",
+        ),
+    }
+    driver, mechanism = category_profiles.get(article.category or "market", category_profiles["market"])
+    return {
+        "driver": driver,
+        "mechanism": mechanism,
+        "affected": [{"symbol": symbol, "role": "mã được bài viết liên kết", "direction": "cần xác nhận"} for symbol in symbols],
+        "caveat": "Chưa có đủ chi tiết để kết luận mã này hưởng lợi hay chịu áp lực.",
+        "timeframe": "Theo dõi phản ứng giá T+1 đến T+5 và thông tin xác nhận tiếp theo.",
+    }
 
 
 @router.get("")
@@ -38,6 +120,7 @@ async def list_news(
         total = await session.scalar(count_stmt) or 0
         articles = list((await session.scalars(stmt)).all())
         related = {}
+        symbol_rows = []
         event_rows = []
         if articles:
             links = (await session.execute(
@@ -46,6 +129,11 @@ async def list_news(
             )).all()
             for article_id, ticker in links:
                 related.setdefault(article_id, []).append(ticker)
+            symbol_rows = list((await session.execute(
+                select(Symbol.symbol, Symbol.name, Symbol.sector).where(
+                    Symbol.symbol.in_({ticker for _, ticker in links})
+                )
+            )).all())
             event_rows = list((await session.scalars(
                 select(NewsEventStudy).where(
                     NewsEventStudy.article_id.in_([article.id for article in articles])
@@ -55,6 +143,10 @@ async def list_news(
     events_by_article = {}
     for event in event_rows:
         events_by_article.setdefault(event.article_id, {})[event.symbol] = event
+    symbol_context = {
+        symbol: {"name": name, "sector": sector}
+        for symbol, name, sector in symbol_rows
+    }
 
     def window_payload(event, horizon: str):
         return {
@@ -107,12 +199,17 @@ async def list_news(
         return reactions
 
     def impact_explanation(article, reactions):
-        possible = {
-            "economic": "Có thể ảnh hưởng đến lãi suất, tỷ giá, chi phí vốn và sức mua.",
-            "regulatory": "Có thể ảnh hưởng đến chi phí tuân thủ, hoạt động và định giá doanh nghiệp.",
-            "stock": "Có thể ảnh hưởng đến doanh thu, lợi nhuận hoặc kỳ vọng của nhà đầu tư.",
-            "market": "Có thể ảnh hưởng đến tâm lý và dòng tiền của một nhóm ngành hoặc toàn thị trường.",
-        }.get(article.category or "market", "Có thể ảnh hưởng đến kỳ vọng và tâm lý thị trường.")
+        symbols = sorted(related.get(article.id, []))
+        profile = _impact_profile(article, symbols)
+        affected = profile["affected"]
+        if affected:
+            names = ", ".join(
+                f'{item["symbol"]} ({symbol_context.get(item["symbol"], {}).get("sector") or "chưa rõ ngành"})'
+                for item in affected
+            )
+            possible = f'{profile["mechanism"]} Mã cần theo dõi: {names}.'
+        else:
+            possible = f'{profile["mechanism"]} Chưa xác định được mã Việt Nam chịu tác động trực tiếp.'
         measured = [reaction for reaction in reactions if reaction["status"] == "measured"]
         if measured:
             observed = "Đã đo được biến động sau tin; đây là tương quan quan sát, không khẳng định tin gây ra biến động."
@@ -123,9 +220,10 @@ async def list_news(
         else:
             observed = "Chưa xác định được mã cổ phiếu liên quan để đo phản ứng giá."
             confidence = "insufficient_data"
-        return possible, observed, confidence
+        return possible, observed, confidence, profile
 
     def forecast_for(article, related):
+        profile = _impact_profile(article, sorted(related))
         direction = {
             "positive": "Tích cực nhẹ",
             "negative": "Tiêu cực nhẹ",
@@ -138,9 +236,11 @@ async def list_news(
             "horizon": "T+1 đến T+5",
             "confidence": min(confidence, 65),
             "basis": (
-                "Dự báo dựa trên sắc thái bài viết, nhóm ngành và mã liên quan; "
-                "chưa phải phản ứng giá đã quan sát."
+                f'Biến số chính: {profile["driver"]}. {profile["caveat"]} '
+                "Đây là kịch bản tham khảo, chưa phải phản ứng giá đã quan sát."
             ),
+            "driver": profile["driver"],
+            "timeframe": profile["timeframe"],
         }
 
     return {
@@ -158,7 +258,7 @@ async def list_news(
             "reactions": reactions_for(article.id),
             "url": article.url,
             **(lambda reactions: dict(zip(
-                ("possibleImpact", "observedImpact", "impactConfidence"),
+                ("possibleImpact", "observedImpact", "impactConfidence", "impactDetail"),
                 impact_explanation(article, reactions),
             )))(reactions_for(article.id)),
             "forecast": forecast_for(article, related.get(article.id, [])),

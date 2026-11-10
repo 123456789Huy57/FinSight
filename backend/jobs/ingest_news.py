@@ -4,10 +4,10 @@ import re
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from core.config import settings
-from db.models import NewsArticle, NewsSymbol, Symbol
+from db.models import NewsArticle, NewsEventStudy, NewsSymbol, Symbol
 from db.session import AsyncSessionLocal
 from domain.sentiment import score_sentiment
 from domain.text import normalize_vi
@@ -38,7 +38,6 @@ def _related_symbols(text: str, symbols: list[tuple[str, str | None]]) -> list[s
     found = []
     upper_text = text.upper()
     normalized_text = normalize_vi(text)
-    generic_name_suffixes = {"viet nam", "tai chinh", "ngan hang", "thuong mai"}
     for code, name in symbols:
         if code.upper() in GENERIC_TICKER_TOKENS:
             continue
@@ -51,10 +50,12 @@ def _related_symbols(text: str, symbols: list[tuple[str, str | None]]) -> list[s
         if len(normalized_name) >= 6 and normalized_name in normalized_text:
             found.append(code)
             continue
-        name_parts = normalized_name.split()
+        name_parts = name.split()
         suffix = " ".join(name_parts[-2:])
-        if len(suffix) >= 6 and suffix not in generic_name_suffixes and re.search(
-            rf"(?<![a-z0-9]){re.escape(suffix)}(?![a-z0-9])", normalized_text
+        normalized_suffix = normalize_vi(suffix)
+        if (
+            len(normalized_suffix) >= 6
+            and re.search(rf"(?<![A-Za-zÀ-ỹ0-9]){re.escape(suffix)}(?![A-Za-zÀ-ỹ0-9])", text)
         ):
             found.append(code)
     return list(dict.fromkeys(found))
@@ -103,6 +104,16 @@ async def ingest_news(limit: int = 50) -> dict[str, int]:
             existing_links = set((await session.scalars(
                 select(NewsSymbol.symbol).where(NewsSymbol.article_id == article_id)
             )).all())
+            stale_links = existing_links - tickers
+            if stale_links:
+                await session.execute(delete(NewsSymbol).where(
+                    NewsSymbol.article_id == article_id,
+                    NewsSymbol.symbol.in_(stale_links),
+                ))
+                await session.execute(delete(NewsEventStudy).where(
+                    NewsEventStudy.article_id == article_id,
+                    NewsEventStudy.symbol.in_(stale_links),
+                ))
             for ticker in tickers - existing_links:
                 session.add(NewsSymbol(article_id=article_id, symbol=ticker))
                 linked += 1
