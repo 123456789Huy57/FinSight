@@ -177,6 +177,39 @@ def _merge_analysis_context(payload: Dict[str, Any]) -> Dict[str, Any]:
 _TREND_VI = {"uptrend": "xu hướng tăng", "downtrend": "xu hướng giảm", "sideways": "đi ngang"}
 
 
+def _forecast_snapshot(technical: Dict[str, Any]) -> Dict[str, Any]:
+    trend = technical.get("trend")
+    daily = technical.get("daily_change_pct")
+    ret_5d = technical.get("ret_5d_pct")
+    if trend == "uptrend" and (daily is None or daily >= 0):
+        return {
+            "direction": "Tích cực nhẹ",
+            "horizon": "T+1 đến T+5",
+            "confidence": 58,
+            "basis": "Xu hướng tăng và biến động gần nhất chưa phủ định đà giá.",
+        }
+    if trend == "downtrend" and (daily is None or daily <= 0):
+        return {
+            "direction": "Tiêu cực nhẹ",
+            "horizon": "T+1 đến T+5",
+            "confidence": 58,
+            "basis": "Xu hướng giảm và biến động gần nhất vẫn gây áp lực lên giá.",
+        }
+    if ret_5d is not None:
+        return {
+            "direction": "Giằng co",
+            "horizon": "T+1 đến T+5",
+            "confidence": 48,
+            "basis": "Tín hiệu ngắn hạn chưa đồng thuận, nên ưu tiên kịch bản dao động.",
+        }
+    return {
+        "direction": "Chưa rõ hướng",
+        "horizon": "T+1 đến T+5",
+        "confidence": 35,
+        "basis": "Dữ liệu kỹ thuật chưa đủ để chọn một hướng có ưu thế.",
+    }
+
+
 def _stock_fallback(symbol: str, context: str = "", technical: Dict[str, Any] | None = None, sector: str | None = None) -> Dict[str, Any]:
     technical = technical or {}
     trend_en = technical.get("trend") or "sideways"
@@ -208,6 +241,7 @@ def _stock_fallback(symbol: str, context: str = "", technical: Dict[str, Any] | 
         "fundamental_snapshot": {
             "sector": sector or "N/A",
         },
+        "forecast": _forecast_snapshot(technical),
         "key_drivers": [
             f"Diễn biến giá và đà tăng/giảm của {symbol}",
             f"Xu hướng kỹ thuật: {trend}, RSI14={rsi_str}",
@@ -278,6 +312,7 @@ def _mock_explanation(payload: Dict[str, Any]) -> Dict[str, Any]:
         "fundamental_snapshot": {
             "sector": sector or "N/A",
         },
+        "forecast": _forecast_snapshot(technical),
         "key_drivers": [
             "Hành động giá và sức mạnh tương đối",
             "Xác nhận khối lượng và độ rộng thị trường",
@@ -483,9 +518,12 @@ def explain(payload: Dict[str, Any]) -> Dict[str, Any]:
         '  "key_drivers": ["lý do 1", "lý do 2", "lý do 3"],\n'
         '  "bullish_factors": ["điểm tích cực 1", "điểm tích cực 2", "điểm tích cực 3"],\n'
         '  "risk_factors": ["rủi ro 1", "rủi ro 2", "rủi ro 3"],\n'
-        '  "watch_next": ["cần theo dõi 1", "cần theo dõi 2", "cần theo dõi 3"]\n'
+        '  "watch_next": ["cần theo dõi 1", "cần theo dõi 2", "cần theo dõi 3"],\n'
+        '  "forecast": {"direction": "Tích cực/tiêu cực/giằng co", "horizon": "T+1 đến T+5", "confidence": 0, "basis": "cơ sở dự báo"}\n'
         '}\n'
-        "Mỗi mảng PHẢI có đúng 3 phần tử. Mỗi phần tử là 1 câu ngắn, cụ thể, có số liệu nếu có trong ngữ cảnh."
+        "Mỗi mảng PHẢI có đúng 3 phần tử. Mỗi phần tử là 1 câu ngắn, cụ thể, có số liệu nếu có trong ngữ cảnh. "
+        "Forecast là kịch bản xác suất tham khảo, không phải lời khuyên giao dịch; confidence phải từ 30 đến 70 "
+        "khi dữ liệu chưa đủ để kiểm định, không được trình bày như sự chắc chắn."
     )
 
     try:
@@ -507,9 +545,10 @@ async def explain_async(payload: Dict[str, Any]) -> Dict[str, Any]:
     payload = await _merge_analysis_context_async(payload)
     system = (
         "Bạn là FinSight AI — chuyên gia phân tích tài chính thị trường chứng khoán Việt Nam. "
-        "Nhiệm vụ: giải thích ngắn gọn, rõ ràng, chuyên sâu bằng tiếng Việt cho nhà đầu tư cá nhân. "
+        "Nhiệm vụ: giải thích ngắn gọn, rõ ràng bằng tiếng Việt cho nhà đầu tư cá nhân. "
         "Phân tích PHẢI bao gồm cả Phân tích kỹ thuật (TA) và Phân tích cơ bản (FA). "
-        "KHÔNG đưa khuyến nghị mua/bán/nắm giữ. Trả lời ĐÚNG định dạng JSON thuần."
+        "KHÔNG đưa khuyến nghị mua/bán/nắm giữ. Hãy đưa một forecast T+1 đến T+5 với hướng, confidence 30-70 "
+        "và cơ sở ngắn gọn. Trả lời ĐÚNG định dạng JSON thuần."
     )
     try:
         content = await asyncio.to_thread(
@@ -520,7 +559,10 @@ async def explain_async(payload: Dict[str, Any]) -> Dict[str, Any]:
             ],
         )
         parsed = _parse_json_response(content)
-        return parsed if parsed and "summary" in parsed else _mock_explanation(payload)
+        if parsed and "summary" in parsed:
+            parsed.setdefault("forecast", _forecast_snapshot(payload.get("technical_snapshot") or {}))
+            return parsed
+        return _mock_explanation(payload)
     except Exception:
         return _mock_explanation(payload)
 

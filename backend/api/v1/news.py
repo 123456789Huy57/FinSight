@@ -125,6 +125,24 @@ async def list_news(
             confidence = "insufficient_data"
         return possible, observed, confidence
 
+    def forecast_for(article, related):
+        direction = {
+            "positive": "Tích cực nhẹ",
+            "negative": "Tiêu cực nhẹ",
+        }.get(article.sentiment, "Giằng co")
+        confidence = 55 if related else 35
+        if article.category in {"economic", "regulatory"}:
+            confidence += 5
+        return {
+            "direction": direction,
+            "horizon": "T+1 đến T+5",
+            "confidence": min(confidence, 65),
+            "basis": (
+                "Dự báo dựa trên sắc thái bài viết, nhóm ngành và mã liên quan; "
+                "chưa phải phản ứng giá đã quan sát."
+            ),
+        }
+
     return {
         "items": [{
             "id": article.id,
@@ -143,6 +161,7 @@ async def list_news(
                 ("possibleImpact", "observedImpact", "impactConfidence"),
                 impact_explanation(article, reactions),
             )))(reactions_for(article.id)),
+            "forecast": forecast_for(article, related.get(article.id, [])),
         } for article in articles],
         "total": total,
         "limit": limit,

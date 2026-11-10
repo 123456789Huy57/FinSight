@@ -10,6 +10,7 @@
 - Panel Explain dùng token tối cũ trên nền sáng nên chữ tương phản thấp; đã đổi sang token `--fs-*` của giao diện sáng và bỏ opacity làm mờ bản xem trước.
 - Explain có thể gọi Gemini trực tiếp qua `GEMINI_API_KEY`; nếu không có thì dùng OpenRouter qua `OPENROUTER_API_KEY`. `GEMINI_MODEL` mặc định là `gemini-2.5-flash`.
 - Explain Gemini giới hạn `maxOutputTokens=700`, timeout provider còn 20 giây; frontend timeout 25 giây và hiển thị fallback nếu provider chậm hoặc lỗi.
+- Explain và tin tức có thêm forecast T+1 đến T+5 với hướng tác động, thanh confidence và cơ sở dự báo; đây là kịch bản xác suất, không phải khuyến nghị hay kết luận nhân quả.
 
 ## BE-DEPLOY-DEBUG — sửa lỗi gọi daily sync trong GitHub Actions
 - Lần chạy workflow #5 đã qua bước `Apply migrations`; lỗi còn lại là `ModuleNotFoundError: No module named 'core'` do chạy file `scripts/daily_sync.py` trực tiếp khiến Python chỉ đặt thư mục `scripts` vào import path.

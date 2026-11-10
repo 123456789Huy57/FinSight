@@ -119,6 +119,18 @@ export function NewsCard({ item, onExplain, focusSymbol }: Props) {
             <p><strong className="font-medium text-[var(--fs-ink)]">Đã quan sát:</strong> {item.observedImpact ?? 'Chưa đủ dữ liệu để đánh giá.'}</p>
           </div>
         )}
+        {item.forecast && (
+          <div className="mt-2 rounded-lg bg-[var(--fs-surface)] px-3 py-2">
+            <div className="flex items-center justify-between gap-3 text-[13px]">
+              <span className="font-medium text-[var(--fs-ink)]">Dự báo {item.forecast.horizon}: {item.forecast.direction}</span>
+              <strong className="tabular-nums text-[var(--fs-signal)]">{Math.round(item.forecast.confidence)}%</strong>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white">
+              <div className="h-full rounded-full bg-[var(--fs-signal)]" style={{ width: `${Math.min(100, Math.max(0, item.forecast.confidence))}%` }} />
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--fs-muted)]">{item.forecast.basis}</p>
+          </div>
+        )}
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {item.affectedTickers.slice(0, 4).map((t) => (

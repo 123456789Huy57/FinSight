@@ -16,6 +16,12 @@ function buildFallback(req: AIExplainRequest | null): AIExplainResponse | null {
       bullish_factors: ['Dòng tiền đang chú ý mã này', 'Xu hướng có thể đang cải thiện', 'Ngành hỗ trợ'],
       risk_factors: ['Rung lắc theo thị trường chung', 'Khối lượng chưa xác nhận', 'Tin xấu đột ngột'],
       watch_next: ['MA20 và MA50', 'RSI14', 'Phản ứng phiên tới'],
+      forecast: {
+        direction: 'Chưa rõ hướng',
+        horizon: 'T+1 đến T+5',
+        confidence: 35,
+        basis: 'Chưa đủ dữ liệu để chọn một hướng có ưu thế.',
+      },
     }
   }
   return {
@@ -24,6 +30,12 @@ function buildFallback(req: AIExplainRequest | null): AIExplainResponse | null {
     bullish_factors: ['Hỗ trợ từ nhóm dẫn dắt', 'Bối cảnh tích cực', 'Xác suất lan tỏa'],
     risk_factors: ['Có thể đảo nhịp', 'Dữ liệu chưa đủ', 'Tin tức bất ngờ'],
     watch_next: ['Xác nhận đóng cửa', 'Phản ứng ngành liên quan', 'Thanh khoản'],
+    forecast: {
+      direction: 'Giằng co',
+      horizon: 'T+1 đến T+5',
+      confidence: 35,
+      basis: 'Dự báo tham khảo khi dữ liệu nền còn hạn chế.',
+    },
   }
 }
 
@@ -136,6 +148,25 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
                 </div>
                 <p className="text-[13px] font-semibold text-[var(--fs-ink)] leading-relaxed">{active.summary}</p>
               </div>
+
+              {/* Live snapshot */}
+              {active.forecast && (
+                <div className="rounded-xl border border-[var(--fs-signal)]/25 bg-[var(--fs-signal-soft)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--fs-signal)]">Dự báo tham khảo</p>
+                      <p className="mt-1 text-[20px] font-semibold text-[var(--fs-ink)]">{active.forecast.direction}</p>
+                      <p className="text-[12px] text-[var(--fs-muted)]">{active.forecast.horizon}</p>
+                    </div>
+                    <strong className="text-[26px] tabular-nums text-[var(--fs-signal)]">{Math.round(active.forecast.confidence)}%</strong>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/80">
+                    <div className="h-full rounded-full bg-[var(--fs-signal)]" style={{ width: `${Math.min(100, Math.max(0, active.forecast.confidence))}%` }} />
+                  </div>
+                  <p className="mt-2 text-[12px] leading-relaxed text-[var(--fs-ink-2)]">{active.forecast.basis}</p>
+                  <p className="mt-2 text-[11px] text-[var(--fs-muted)]">Xác suất tham khảo, không phải khuyến nghị đầu tư.</p>
+                </div>
+              )}
 
               {/* Live snapshot */}
               {request?.snapshot && (
