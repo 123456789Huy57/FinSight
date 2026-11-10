@@ -62,7 +62,9 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
 
     explainItem(request)
       .then((res) => { if (!cancelled) setData(res) })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) setData(fallback)
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }

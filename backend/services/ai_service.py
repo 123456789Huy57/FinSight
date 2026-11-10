@@ -399,7 +399,13 @@ def _call_gemini(messages: list[dict[str, str]]) -> str:
          "parts": [{"text": message["content"]}]}
         for message in messages if message["role"] != "system"
     ]
-    payload: dict[str, Any] = {"contents": contents}
+    payload: dict[str, Any] = {
+        "contents": contents,
+        "generationConfig": {
+            "temperature": 0.3,
+            "maxOutputTokens": 700,
+        },
+    }
     if system:
         payload["systemInstruction"] = {"parts": [{"text": system}]}
     response = requests.post(
@@ -407,7 +413,7 @@ def _call_gemini(messages: list[dict[str, str]]) -> str:
         params={"key": api_key},
         headers={"Content-Type": "application/json"},
         data=json.dumps(payload),
-        timeout=45,
+        timeout=20,
     )
     response.raise_for_status()
     data = response.json()
