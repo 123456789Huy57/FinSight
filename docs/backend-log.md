@@ -16,6 +16,7 @@
 - Khi RSS cập nhật lại bài, ingest xoá liên kết mã và event study cũ nếu bài không còn nhắc mã đó; tránh giữ dữ liệu gán nhầm từ lần ingest trước.
 - Sửa lỗi nghiêm trọng: bỏ khớp hai từ cuối tên công ty và loại các từ chức danh như CEO khỏi nhận diện mã; tin Nvidia không được suy diễn thành bất động sản, xây dựng hoặc dược phẩm.
 - Backfill lịch sử ưu tiên nhóm mã chính, bắt đầu với HPG, để mã có quote nhưng chưa có lịch sử sớm có biểu đồ; vẫn chỉ dùng dữ liệu Vnstock thật, không tạo CSV thay thế.
+- `relink_news --apply` chỉ xoá liên kết cũ không còn được matcher xác nhận, không tự thêm liên kết mới từ dữ liệu lịch sử; tránh cleanup biến thành nguồn gán mã sai mới.
 
 ## BE-DEPLOY-DEBUG — sửa lỗi gọi daily sync trong GitHub Actions
 - Lần chạy workflow #5 đã qua bước `Apply migrations`; lỗi còn lại là `ModuleNotFoundError: No module named 'core'` do chạy file `scripts/daily_sync.py` trực tiếp khiến Python chỉ đặt thư mục `scripts` vào import path.

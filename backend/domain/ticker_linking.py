@@ -26,7 +26,7 @@ NAME_STOPWORDS = (
     "ngan hang", "tmcp", "dau tu", "xay dung", "phat trien", "thuong mai",
     "dich vu", "san xuat", "bat dong san", "duoc pham", "tai chinh",
     "chung khoan", "viet nam", "group", "corporation", "corp", "jsc",
-    "joint stock company", "holdings", "company",
+    "joint stock company", "holdings", "company", "cong thuong",
 )
 
 # Core names that are ordinary phrases and must never count as evidence.
@@ -37,7 +37,7 @@ COMMON_PHRASES = {
     "xuat nhap khau", "van tai", "dau khi", "dien luc", "nong nghiep",
     "hang khong", "bao hiem", "chung khoan", "the gioi", "quoc te",
     "sai gon", "ha noi", "mien nam", "mien bac", "thanh cong", "hung thinh",
-    "an phat", "phu cuong", "tan phu", "hoa binh",
+    "an phat", "phu cuong", "tan phu", "hoa binh", "petrovietnam",
 }
 MIN_CORE_LEN = 6
 

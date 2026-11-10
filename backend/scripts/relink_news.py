@@ -1,10 +1,14 @@
-"""Re-run ticker linking for every stored article (idempotent).
+"""Remove stale ticker links for every stored article (idempotent).
 
 Default is a dry run that only reports what would change:
     python -m scripts.relink_news
-Apply the changes (removes stale links and their event studies):
+Apply removals (does not add newly inferred links):
     python -m scripts.relink_news --apply
 Re-running after --apply reports 0 changes.
+
+This command deliberately does not add links. Reconstructing historical links
+from a changed matcher can create false positives; new links are created only
+when a fresh article is ingested.
 """
 
 import argparse
@@ -18,7 +22,7 @@ from domain.ticker_linking import related_symbols
 
 
 async def relink(apply: bool) -> dict[str, int]:
-    removed = added = studies = touched = 0
+    removed = studies = touched = 0
     async with AsyncSessionLocal() as session:
         listed = list((await session.execute(
             select(Symbol.symbol, Symbol.name).where(Symbol.is_active.is_(True))
@@ -33,16 +37,13 @@ async def relink(apply: bool) -> dict[str, int]:
             current = set((await session.scalars(
                 select(NewsSymbol.symbol).where(NewsSymbol.article_id == article_id)
             )).all())
-            stale, new = current - wanted, wanted - current
-            if not stale and not new:
+            stale = current - wanted
+            if not stale:
                 continue
             touched += 1
             for code in sorted(stale):
                 print(f"REMOVE {article_id} {code} | {title[:80]}")
-            for code in sorted(new):
-                print(f"ADD    {article_id} {code} | {title[:80]}")
             removed += len(stale)
-            added += len(new)
             if stale:
                 studies += len((await session.scalars(select(NewsEventStudy.article_id).where(
                     NewsEventStudy.article_id == article_id, NewsEventStudy.symbol.in_(stale)
@@ -53,12 +54,10 @@ async def relink(apply: bool) -> dict[str, int]:
                         NewsEventStudy.article_id == article_id, NewsEventStudy.symbol.in_(stale)))
                     await session.execute(delete(NewsSymbol).where(
                         NewsSymbol.article_id == article_id, NewsSymbol.symbol.in_(stale)))
-                for code in new:
-                    session.add(NewsSymbol(article_id=article_id, symbol=code))
         if apply:
             await session.commit()
     result = {"articles": len(articles), "articlesChanged": touched, "linksRemoved": removed,
-              "linksAdded": added, "eventStudiesRemoved": studies, "applied": int(apply)}
+              "linksAdded": 0, "eventStudiesRemoved": studies, "applied": int(apply)}
     print(result)
     return result
 

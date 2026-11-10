@@ -40,3 +40,14 @@ def test_ticker_inside_word_or_lowercase_is_ignored() -> None:
 def test_core_name_strips_legal_form() -> None:
     assert core_name("Công ty Cổ phần Tập đoàn Hòa Phát") == "hoa phat"
     assert core_name("Ngân hàng TMCP Ngoại thương Việt Nam") == "ngoai thuong"
+
+
+def test_generic_organization_names_do_not_link_news() -> None:
+    assert related_symbols(
+        "Bộ Công Thương yêu cầu không để gián đoạn nguồn cung.",
+        [("CTG", "Công ty Cổ phần Công Thương")],
+    ) == []
+    assert related_symbols(
+        "Petrovietnam trong top 500 doanh nghiệp lớn nhất.",
+        [("SSB", "Công ty Cổ phần Petrovietnam")],
+    ) == []
