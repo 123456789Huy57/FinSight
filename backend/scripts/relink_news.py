@@ -1,0 +1,69 @@
+"""Re-run ticker linking for every stored article (idempotent).
+
+Default is a dry run that only reports what would change:
+    python -m scripts.relink_news
+Apply the changes (removes stale links and their event studies):
+    python -m scripts.relink_news --apply
+Re-running after --apply reports 0 changes.
+"""
+
+import argparse
+import asyncio
+
+from sqlalchemy import delete, select
+
+from db.models import NewsArticle, NewsEventStudy, NewsSymbol, Symbol
+from db.session import AsyncSessionLocal
+from domain.ticker_linking import related_symbols
+
+
+async def relink(apply: bool) -> dict[str, int]:
+    removed = added = studies = touched = 0
+    async with AsyncSessionLocal() as session:
+        listed = list((await session.execute(
+            select(Symbol.symbol, Symbol.name).where(Symbol.is_active.is_(True))
+        )).all())
+        pairs = [(code, name) for code, name in listed]
+        valid = {code for code, _ in listed}
+        articles = (await session.execute(
+            select(NewsArticle.id, NewsArticle.title, NewsArticle.summary)
+        )).all()
+        for article_id, title, summary in articles:
+            wanted = set(related_symbols(f"{title} {summary or ''}", pairs)) & valid
+            current = set((await session.scalars(
+                select(NewsSymbol.symbol).where(NewsSymbol.article_id == article_id)
+            )).all())
+            stale, new = current - wanted, wanted - current
+            if not stale and not new:
+                continue
+            touched += 1
+            for code in sorted(stale):
+                print(f"REMOVE {article_id} {code} | {title[:80]}")
+            for code in sorted(new):
+                print(f"ADD    {article_id} {code} | {title[:80]}")
+            removed += len(stale)
+            added += len(new)
+            if stale:
+                studies += len((await session.scalars(select(NewsEventStudy.article_id).where(
+                    NewsEventStudy.article_id == article_id, NewsEventStudy.symbol.in_(stale)
+                ))).all())
+            if apply:
+                if stale:
+                    await session.execute(delete(NewsEventStudy).where(
+                        NewsEventStudy.article_id == article_id, NewsEventStudy.symbol.in_(stale)))
+                    await session.execute(delete(NewsSymbol).where(
+                        NewsSymbol.article_id == article_id, NewsSymbol.symbol.in_(stale)))
+                for code in new:
+                    session.add(NewsSymbol(article_id=article_id, symbol=code))
+        if apply:
+            await session.commit()
+    result = {"articles": len(articles), "articlesChanged": touched, "linksRemoved": removed,
+              "linksAdded": added, "eventStudiesRemoved": studies, "applied": int(apply)}
+    print(result)
+    return result
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true", help="write changes (default: dry run)")
+    asyncio.run(relink(parser.parse_args().apply))

@@ -1,0 +1,551 @@
+[
+ {
+  "id": "R01",
+  "src": "mekongasean.vn",
+  "text": "VIC trở thành trụ đỡ chính, VN-Index 'chật vật' giữ sắc xanh",
+  "gold": [
+   "VIC"
+  ]
+ },
+ {
+  "id": "R02",
+  "src": "mekongasean.vn",
+  "text": "Loạt cổ phiếu rủ nhau 'xanh, tím', VN-Index bật tăng hơn 33 điểm",
+  "gold": []
+ },
+ {
+  "id": "R03",
+  "src": "mekongasean.vn",
+  "text": "VIC lập đỉnh mới, một cổ phiếu 'tím lịm' chục phiên",
+  "gold": [
+   "VIC"
+  ]
+ },
+ {
+  "id": "R04",
+  "src": "thuonghieucongluan.com.vn",
+  "text": "Hòa Phát (HPG): Khuyến nghị mua, giá mục tiêu 35.000 đồng/cp",
+  "gold": [
+   "HPG"
+  ]
+ },
+ {
+  "id": "R05",
+  "src": "vietbao.vn",
+  "text": "Chứng khoán tháng 11: Dòng tiền tìm cơ hội từ lợi nhuận doanh nghiệp",
+  "gold": []
+ },
+ {
+  "id": "R06",
+  "src": "mekongasean.vn",
+  "text": "VN-Index mất mốc 1.700 điểm, HPG ngược dòng tăng mạnh",
+  "gold": [
+   "HPG"
+  ]
+ },
+ {
+  "id": "R07",
+  "src": "mekongasean.vn",
+  "text": "Khối ngoại mua ròng, FPT giảm mạnh cùng xu hướng cổ phiếu công nghệ",
+  "gold": [
+   "FPT"
+  ]
+ },
+ {
+  "id": "R08",
+  "src": "mekongasean.vn",
+  "text": "VN-Index lùi về sát mốc 1.200 điểm, nhóm công nghệ viễn thông giảm mạnh",
+  "gold": []
+ },
+ {
+  "id": "R09",
+  "src": "mekongasean.vn",
+  "text": "Khối ngoại rót ròng gần 700 tỷ đồng, FPT ‘gồng lưng’ gánh thị trường",
+  "gold": [
+   "FPT"
+  ]
+ },
+ {
+  "id": "R10",
+  "src": "mekongasean.vn",
+  "text": "Gần 150 triệu cổ phiếu Tôn Đông Á chốt ngày giao dịch trên HoSE",
+  "gold": []
+ },
+ {
+  "id": "R11",
+  "src": "thoibaotaichinhvietnam.vn",
+  "text": "Lãi suất liên ngân hàng tiếp tục hạ nhiệt",
+  "gold": []
+ },
+ {
+  "id": "R12",
+  "src": "mekongasean.vn",
+  "text": "Masan báo lãi quý cao nhất trong 5 năm",
+  "gold": [
+   "MSN"
+  ]
+ },
+ {
+  "id": "R13",
+  "src": "theinvestor.vn",
+  "text": "Earnings of listed Vietnamese companies likely up 27% in Q3: broker",
+  "gold": []
+ },
+ {
+  "id": "R14",
+  "src": "mekongasean.vn",
+  "text": "Ngành bất động sản quý 3: Tín hiệu khởi sắc từ doanh thu",
+  "gold": []
+ },
+ {
+  "id": "R15",
+  "src": "mekongasean.vn",
+  "text": "BSR thu hơn 9.000 tỷ đồng từ kinh doanh xăng E10 trong 3 quý",
+  "gold": []
+ },
+ {
+  "id": "R16",
+  "src": "mekongasean.vn",
+  "text": "Thêm một doanh nghiệp bất động sản báo lãi quý 3 đột biến",
+  "gold": []
+ },
+ {
+  "id": "R17",
+  "src": "mekongasean.vn",
+  "text": "DXG báo lãi giảm 98%, hơn 9.000 tỷ đồng người mua trả tiền trước",
+  "gold": [
+   "DXG"
+  ]
+ },
+ {
+  "id": "R18",
+  "src": "thoibaotaichinhvietnam.vn",
+  "text": "Thị trường tiền tệ tuần đầu tháng 5: Nhiều biến động từ thị trường tài chính quốc tế",
+  "gold": []
+ },
+ {
+  "id": "S01",
+  "src": "baodautu.vn (slug)",
+  "text": "thanh khoan ky luc truoc moc 1000 diem hon 120 ty dong von ngoai do vao hoa phat",
+  "gold": [
+   "HPG"
+  ]
+ },
+ {
+  "id": "S02",
+  "src": "thitruongtaichinhtiente.vn (slug)",
+  "text": "sabeco lai 3 761 ty dong sau 9 thang tam ung co tuc tien mat 30",
+  "gold": [
+   "SAB"
+  ]
+ },
+ {
+  "id": "S03",
+  "src": "vneconomy.vn (slug)",
+  "text": "thi truong giam manh su kien tri se tao ra nhung khoan loi nhuan dot bien trong tuong lai",
+  "gold": []
+ },
+ {
+  "id": "S04",
+  "src": "vneconomy.vn (slug)",
+  "text": "chung khoan nam 2026 lo lai suat va ngao op ty gia",
+  "gold": []
+ },
+ {
+  "id": "S05",
+  "src": "vneconomy.vn (slug)",
+  "text": "ngan hang nha nuoc hut rong tro lai",
+  "gold": []
+ },
+ {
+  "id": "S06",
+  "src": "baodautu.vn (slug)",
+  "text": "co phieu thep dan dat da tang vn index hoi phuc phien thu ba",
+  "gold": []
+ },
+ {
+  "id": "A01",
+  "src": "audit brief",
+  "text": "Vụ bê bối của CEO Jensen Huang đặt tương lai Nvidia vào thế khó",
+  "gold": []
+ },
+ {
+  "id": "A02",
+  "src": "audit brief",
+  "text": "Hòa Phát công bố kết quả kinh doanh",
+  "gold": [
+   "HPG"
+  ]
+ },
+ {
+  "id": "A03",
+  "src": "audit brief",
+  "text": "Ngành xây dựng, dược phẩm và bất động sản phục hồi trong quý tới",
+  "gold": []
+ },
+ {
+  "id": "A04",
+  "src": "audit brief",
+  "text": "Khung giá điện mặt trời cao nhất hơn 2.120 đồng một kWh",
+  "gold": []
+ },
+ {
+  "id": "A05",
+  "src": "audit brief",
+  "text": "Lãi suất cho vay tiếp tục giảm, thị trường kỳ vọng tín dụng tăng tốc",
+  "gold": []
+ },
+ {
+  "id": "A06",
+  "src": "audit brief",
+  "text": "Tỷ giá USD/VND tăng, doanh nghiệp nhập khẩu chịu áp lực chi phí",
+  "gold": []
+ },
+ {
+  "id": "A07",
+  "src": "constructed",
+  "text": "CEO của FPT chia sẻ chiến lược AI trong năm tới",
+  "gold": [
+   "FPT"
+  ]
+ },
+ {
+  "id": "A08",
+  "src": "constructed",
+  "text": "Vietcombank giảm lãi suất cho vay hỗ trợ doanh nghiệp",
+  "gold": [
+   "VCB"
+  ]
+ },
+ {
+  "id": "A09",
+  "src": "constructed",
+  "text": "Cổ phiếu Traphaco tăng trần sau kết quả quý 3",
+  "gold": [
+   "TRA"
+  ]
+ },
+ {
+  "id": "A10",
+  "src": "constructed",
+  "text": "Tập đoàn C.E.O khởi công dự án mới",
+  "gold": [
+   "CEO"
+  ]
+ },
+ {
+  "id": "A11",
+  "src": "constructed",
+  "text": "PV GAS và Petrovietnam Power cùng tăng khi giá dầu phục hồi",
+  "gold": [
+   "GAS",
+   "POW"
+  ]
+ },
+ {
+  "id": "A12",
+  "src": "constructed",
+  "text": "SSI Securities được chấp thuận tăng vốn điều lệ",
+  "gold": [
+   "SSI"
+  ]
+ },
+ {
+  "id": "A13",
+  "src": "constructed",
+  "text": "Thị trường mới nổi hút dòng vốn ngoại, gas và dầu tăng giá",
+  "gold": []
+ },
+ {
+  "id": "A14",
+  "src": "constructed",
+  "text": "Kido Group đặt mục tiêu lợi nhuận cao hơn, Vincom Retail mở thêm trung tâm",
+  "gold": [
+   "KDC",
+   "VRE"
+  ]
+ },
+ {
+  "id": "A15",
+  "src": "constructed",
+  "text": "Mbb và acb viết thường trong bình luận của nhà đầu tư",
+  "gold": []
+ },
+ {
+  "id": "A16",
+  "src": "constructed",
+  "text": "Ngân hàng BIDV và Dat Xanh Group ký hợp tác tín dụng",
+  "gold": [
+   "BID",
+   "DXG"
+  ]
+ },
+ {
+  "id": "R19",
+  "src": "mekongasean.vn",
+  "text": "Lãnh đạo Vinamilk chia sẻ thời điểm sẵn sàng bước vào chu kỳ tăng trưởng mới",
+  "gold": [
+   "VNM"
+  ]
+ },
+ {
+  "id": "R20",
+  "src": "mekongasean.vn",
+  "text": "Triển vọng ngành hàng tiêu dùng thiết yếu và cơ hội của Vinamilk, Masan",
+  "gold": [
+   "VNM",
+   "MSN"
+  ]
+ },
+ {
+  "id": "R21",
+  "src": "mekongasean.vn",
+  "text": "Masan Consumer muốn lên HoSE vào năm 2025, chào bán hơn 300 triệu cổ phiếu",
+  "gold": []
+ },
+ {
+  "id": "R22",
+  "src": "mekongasean.vn",
+  "text": "Triển vọng thị trường thịt mát Việt Nam và cơ hội của Vissan, Masan",
+  "gold": [
+   "MSN"
+  ]
+ },
+ {
+  "id": "R23",
+  "src": "mekongasean.vn",
+  "text": "Hai lý do khiến SSI lạc quan với triển vọng cổ phiếu VNM",
+  "gold": [
+   "SSI",
+   "VNM"
+  ]
+ },
+ {
+  "id": "R24",
+  "src": "mekongasean.vn",
+  "text": "Doanh nghiệp 'họ Masan' chốt quyền chia cổ tức tiền mặt, tỷ lệ 95%",
+  "gold": []
+ },
+ {
+  "id": "R25",
+  "src": "vietnamfinance.vn",
+  "text": "Vinamilk báo lãi quý III trên 3.100 tỷ, tăng trưởng 16%",
+  "gold": [
+   "VNM"
+  ]
+ },
+ {
+  "id": "R26",
+  "src": "mekongasean.vn",
+  "text": "ĐHĐCĐ Masan: Mục tiêu lợi nhuận gấp đôi, 3 phương án tăng vốn",
+  "gold": [
+   "MSN"
+  ]
+ },
+ {
+  "id": "R27",
+  "src": "mekongasean.vn",
+  "text": "Con gái Chủ tịch Masan dự chi gần 800 tỷ đồng mua cổ phiếu MSN",
+  "gold": [
+   "MSN"
+  ]
+ },
+ {
+  "id": "R28",
+  "src": "theinvestor.vn",
+  "text": "Banks dominate Vietnam's Q3 earnings season, Novaland posts biggest loss",
+  "gold": [
+   "NVL"
+  ]
+ },
+ {
+  "id": "R29",
+  "src": "en.vietstock.vn",
+  "text": "Banks set to report profit surge in third quarter",
+  "gold": []
+ },
+ {
+  "id": "R30",
+  "src": "bizhub.vietnamnews.vn",
+  "text": "Bank profits rebound on strong credit growth",
+  "gold": []
+ },
+ {
+  "id": "R31",
+  "src": "baomoi.com",
+  "text": "Techcombank (TCB): Lãi quý 3 cao nhất lịch sử 8.300 tỷ đồng, 'xóa' 9.940 tỷ đồng nợ trái phiếu",
+  "gold": [
+   "TCB"
+  ]
+ },
+ {
+  "id": "R32",
+  "src": "vnbusiness.vn",
+  "text": "Ngân hàng đua nhau báo lãi nghìn tỷ sau 9 tháng, xuất hiện nhà băng về đích sớm",
+  "gold": []
+ },
+ {
+  "id": "R33",
+  "src": "nhadautu.vn",
+  "text": "10 nhà băng báo lãi trên 10.000 tỷ",
+  "gold": []
+ },
+ {
+  "id": "R34",
+  "src": "theleader.vn",
+  "text": "Động lực mới dẫn dắt tăng trưởng lợi nhuận ngành ngân hàng",
+  "gold": []
+ },
+ {
+  "id": "R35",
+  "src": "mekongasean.vn",
+  "text": "Cổ phiếu của Thaiholdings 'đổ đèo', PLX tăng trần sau động thái mới",
+  "gold": [
+   "PLX"
+  ]
+ },
+ {
+  "id": "R36",
+  "src": "mekongasean.vn",
+  "text": "Nhóm dầu khí lại 'bốc đầu', cổ phiếu của Vinaconex giảm sàn phiên thứ hai",
+  "gold": []
+ },
+ {
+  "id": "R37",
+  "src": "mekongasean.vn",
+  "text": "Cổ phiếu dầu khí 'lao dốc', nhóm bất động sản hồi phục",
+  "gold": []
+ },
+ {
+  "id": "R38",
+  "src": "mekongasean.vn",
+  "text": "SGI Capital chỉ ra yếu tố vượt trội của thị trường chứng khoán Việt Nam",
+  "gold": []
+ },
+ {
+  "id": "R39",
+  "src": "mekongasean.vn",
+  "text": "VN-Index 'quay xe' trong phiên, cổ phiếu dầu khí hồi phục",
+  "gold": []
+ },
+ {
+  "id": "R40",
+  "src": "nhadautu.vn",
+  "text": "PLX tăng trần, VN-Index dứt chuỗi giảm điểm",
+  "gold": [
+   "PLX"
+  ]
+ },
+ {
+  "id": "R41",
+  "src": "mekongasean.vn",
+  "text": "Nhóm Vingroup bị chốt lời, cổ phiếu Vietjet tăng trần phiên thứ ba",
+  "gold": [
+   "VIC",
+   "VJC"
+  ]
+ },
+ {
+  "id": "R42",
+  "src": "mekongasean.vn",
+  "text": "Hai mã ngân hàng tăng trần, PNJ vẫn giảm mạnh",
+  "gold": [
+   "PNJ"
+  ]
+ },
+ {
+  "id": "R43",
+  "src": "mekongasean.vn",
+  "text": "Cổ phiếu PET giảm sàn sau chuỗi 7 phiên tăng lập đỉnh",
+  "gold": []
+ },
+ {
+  "id": "R44",
+  "src": "mekongasean.vn",
+  "text": "Cổ phiếu dầu khí tăng tốc, NVL bị bán tháo hơn 70 triệu cổ phiếu",
+  "gold": [
+   "NVL"
+  ]
+ },
+ {
+  "id": "R45",
+  "src": "vnbusiness.vn",
+  "text": "VN-Index đỏ rực phiên cuối tuần, PNJ và VNM ngược dòng bứt phá",
+  "gold": [
+   "PNJ",
+   "VNM"
+  ]
+ },
+ {
+  "id": "R46",
+  "src": "mekongasean.vn",
+  "text": "PNJ và NVL 'trắng bên mua', cổ phiếu dầu khí ngược dòng thị trường",
+  "gold": [
+   "PNJ",
+   "NVL"
+  ]
+ },
+ {
+  "id": "R47",
+  "src": "mekongasean.vn",
+  "text": "Cổ phiếu FPT hồi phục, PNJ tiếp tục 'dò đáy'",
+  "gold": [
+   "FPT",
+   "PNJ"
+  ]
+ },
+ {
+  "id": "R48",
+  "src": "cafef.vn",
+  "text": "Chuyện gì xảy ra với cổ phiếu dầu khí?",
+  "gold": []
+ },
+ {
+  "id": "S07",
+  "src": "vneconomy.vn (slug)",
+  "text": "sau nhieu lan that bai fn dairy investments pte ltd van kien tri mua co phieu vnm",
+  "gold": [
+   "VNM"
+  ]
+ },
+ {
+  "id": "S08",
+  "src": "vneconomy.vn (slug)",
+  "text": "vinamilk tang co tuc len 40 bang tien mat",
+  "gold": [
+   "VNM"
+  ]
+ },
+ {
+  "id": "S09",
+  "src": "vneconomy.vn (slug)",
+  "text": "vnm chot danh sach hop co dong va tam ung co tuc dot 3 2023",
+  "gold": [
+   "VNM"
+  ]
+ },
+ {
+  "id": "S10",
+  "src": "doanhnhan.baophapluat.vn (slug)",
+  "text": "du phong loi nhuan ngan hang quy iii vietcombank vpbank va techcombank dan dat da tang truong",
+  "gold": [
+   "VCB",
+   "VPB",
+   "TCB"
+  ]
+ },
+ {
+  "id": "S11",
+  "src": "doanhnhan.baophapluat.vn (slug)",
+  "text": "ky vong thu hoi no nghin ty sacombank stb va loat nha bang don song loi nhuan",
+  "gold": [
+   "STB"
+  ]
+ },
+ {
+  "id": "S12",
+  "src": "vnbusiness.vn (slug)",
+  "text": "loi nhuan nganh ngan hang quy iii co su phan hoa manh",
+  "gold": []
+ }
+]

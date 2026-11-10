@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import re
 import uuid
 from datetime import datetime
 
@@ -11,6 +10,7 @@ from db.models import NewsArticle, NewsEventStudy, NewsSymbol, Symbol
 from db.session import AsyncSessionLocal
 from domain.sentiment import score_sentiment
 from domain.text import normalize_vi
+from domain.ticker_linking import related_symbols
 from services.news_service import canonicalize_url, fetch_news_items, normalize_published_at, story_hash
 
 logger = logging.getLogger(__name__)
@@ -21,16 +21,6 @@ CATEGORY_RULES = {
     "stock": ("cổ phiếu", "doanh nghiệp", "công ty", "kết quả kinh doanh", "cổ đông"),
 }
 
-GENERIC_TICKER_TOKENS = {
-    "AI", "CEO", "CFO", "CTO", "GDP", "IPO", "USD", "EUR", "ETF",
-    "FED", "FTSE", "PMP", "PMW",
-}
-GENERIC_NAME_SUFFIXES = {
-    "bat dong san", "dau tu", "duoc pham", "ngan hang", "tai chinh",
-    "thuong mai", "xay dung", "viet nam",
-}
-
-
 def _category(text: str) -> str:
     normalized = normalize_vi(text)
     for category, terms in CATEGORY_RULES.items():
@@ -40,29 +30,7 @@ def _category(text: str) -> str:
 
 
 def _related_symbols(text: str, symbols: list[tuple[str, str | None]]) -> list[str]:
-    found = []
-    normalized_text = normalize_vi(text)
-    for code, name in symbols:
-        if code.upper() in GENERIC_TICKER_TOKENS:
-            continue
-        if re.search(rf"(?<![A-Za-z0-9]){re.escape(code.upper())}(?![A-Za-z0-9])", text):
-            found.append(code)
-            continue
-        if not name:
-            continue
-        normalized_name = normalize_vi(name)
-        if len(normalized_name) >= 6 and normalized_name in normalized_text:
-            found.append(code)
-            continue
-        name_parts = normalized_name.split()
-        alias = " ".join(name_parts[-2:])
-        if (
-            len(alias) >= 6
-            and alias not in GENERIC_NAME_SUFFIXES
-            and re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", normalized_text)
-        ):
-            found.append(code)
-    return list(dict.fromkeys(found))
+    return related_symbols(text, symbols)
 
 
 async def ingest_news(limit: int = 50) -> dict[str, int]:
