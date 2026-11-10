@@ -22,8 +22,12 @@ CATEGORY_RULES = {
 }
 
 GENERIC_TICKER_TOKENS = {
-    "AI", "CEO", "CFO", "CTO", "USD", "EUR", "GDP", "ETF", "FED", "FTSE",
-    "PMP", "PMW",
+    "AI", "CEO", "CFO", "CTO", "GDP", "IPO", "USD", "EUR", "ETF",
+    "FED", "FTSE", "PMP", "PMW",
+}
+GENERIC_NAME_SUFFIXES = {
+    "bat dong san", "dau tu", "duoc pham", "ngan hang", "tai chinh",
+    "thuong mai", "xay dung", "viet nam",
 }
 
 
@@ -41,13 +45,7 @@ def _related_symbols(text: str, symbols: list[tuple[str, str | None]]) -> list[s
     for code, name in symbols:
         if code.upper() in GENERIC_TICKER_TOKENS:
             continue
-        # A ticker must be explicitly written in uppercase. Matching an
-        # accent-stripped lowercase substring turns words such as "điều tra"
-        # into the TRA ticker.
-        if code.isalpha() and re.search(
-            rf"(?<![A-Za-zÀ-ỹ0-9]){re.escape(code.upper())}(?![A-Za-zÀ-ỹ0-9])",
-            text,
-        ):
+        if re.search(rf"(?<![A-Za-z0-9]){re.escape(code.upper())}(?![A-Za-z0-9])", text):
             found.append(code)
             continue
         if not name:
@@ -57,43 +55,14 @@ def _related_symbols(text: str, symbols: list[tuple[str, str | None]]) -> list[s
             found.append(code)
             continue
         name_parts = normalized_name.split()
-        suffix = " ".join(name_parts[-2:])
+        alias = " ".join(name_parts[-2:])
         if (
-            len(name_parts) >= 2
-            and len(suffix) >= 6
-            and re.search(rf"(?<![a-z0-9]){re.escape(suffix)}(?![a-z0-9])", normalized_text)
+            len(alias) >= 6
+            and alias not in GENERIC_NAME_SUFFIXES
+            and re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", normalized_text)
         ):
             found.append(code)
     return list(dict.fromkeys(found))
-
-
-async def _reconcile_existing_links(
-    session,
-    symbol_pairs: list[tuple[str, str | None]],
-    valid_symbols: set[str],
-) -> None:
-    articles = list((await session.scalars(select(NewsArticle))).all())
-    links = list((await session.scalars(select(NewsSymbol))).all())
-    links_by_article: dict[str, set[str]] = {}
-    for link in links:
-        links_by_article.setdefault(link.article_id, set()).add(link.symbol)
-
-    for article in articles:
-        expected = set(_related_symbols(
-            f"{article.title} {article.summary or ''}",
-            symbol_pairs,
-        )) & valid_symbols
-        stale = links_by_article.get(article.id, set()) - expected
-        if not stale:
-            continue
-        await session.execute(delete(NewsSymbol).where(
-            NewsSymbol.article_id == article.id,
-            NewsSymbol.symbol.in_(stale),
-        ))
-        await session.execute(delete(NewsEventStudy).where(
-            NewsEventStudy.article_id == article.id,
-            NewsEventStudy.symbol.in_(stale),
-        ))
 
 
 async def ingest_news(limit: int = 50) -> dict[str, int]:
@@ -152,6 +121,5 @@ async def ingest_news(limit: int = 50) -> dict[str, int]:
             for ticker in tickers - existing_links:
                 session.add(NewsSymbol(article_id=article_id, symbol=ticker))
                 linked += 1
-        await _reconcile_existing_links(session, symbol_pairs, valid_symbols)
         await session.commit()
     return {"fetched": len(articles), "inserted": inserted, "tickerLinks": linked}

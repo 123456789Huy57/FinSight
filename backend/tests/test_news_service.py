@@ -88,18 +88,21 @@ def test_related_symbols_ignores_common_non_stock_tokens():
     ) == []
 
 
-def test_related_symbols_requires_explicit_uppercase_ticker() -> None:
+def test_related_symbols_does_not_infer_industries_from_partial_names() -> None:
+    article = "Vụ bê bối của CEO Jensen Huang đặt tương lai Nvidia vào thế khó."
     symbols = [
-        ("CEO", "Công ty Cổ phần Đầu tư CEO"),
-        ("LAI", "Công ty Cổ phần Lai"),
+        ("CEO", "Công ty Cổ phần Tập đoàn C.E.O"),
+        ("LAI", "Công ty Cổ phần Đầu tư Xây dựng"),
         ("TRA", "Công ty Cổ phần Traphaco"),
     ]
+    assert _related_symbols(article, symbols) == []
+
+
+def test_related_symbols_requires_uppercase_ticker_token() -> None:
     assert _related_symbols(
-        "Vụ bê bối của CEO Jensen Huang đặt tương lai Nvidia vào thế khó. "
-        "Áp lực đang đè nặng lên nhà sản xuất chip.",
-        symbols,
+        "Tương lai của ngành công nghệ còn nhiều biến động.",
+        [("LAI", "Công ty Cổ phần Đầu tư Xây dựng")],
     ) == []
-    assert _related_symbols("TRA công bố kết quả kinh doanh", symbols) == ["TRA"]
 
 
 def test_impact_profile_names_the_transmission_variable() -> None:
