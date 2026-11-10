@@ -68,7 +68,7 @@ export function ExplainPanel({ isOpen, onClose, request }: Props) {
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [isOpen, request])
+  }, [fallback, isOpen, request])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
