@@ -88,6 +88,20 @@ def test_related_symbols_ignores_common_non_stock_tokens():
     ) == []
 
 
+def test_related_symbols_requires_explicit_uppercase_ticker() -> None:
+    symbols = [
+        ("CEO", "Công ty Cổ phần Đầu tư CEO"),
+        ("LAI", "Công ty Cổ phần Lai"),
+        ("TRA", "Công ty Cổ phần Traphaco"),
+    ]
+    assert _related_symbols(
+        "Vụ bê bối của CEO Jensen Huang đặt tương lai Nvidia vào thế khó. "
+        "Áp lực đang đè nặng lên nhà sản xuất chip.",
+        symbols,
+    ) == []
+    assert _related_symbols("TRA công bố kết quả kinh doanh", symbols) == ["TRA"]
+
+
 def test_impact_profile_names_the_transmission_variable() -> None:
     article = type("Article", (), {
         "title": "Khung giá điện mặt trời cao nhất hơn 2.120 đồng một kWh",
