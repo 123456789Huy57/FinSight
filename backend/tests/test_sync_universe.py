@@ -31,6 +31,18 @@ def test_quota_guard_reserves_capacity_for_other_vnstock_use():
     assert not quota_has_headroom({"limits": {}, "used": {}})
 
 
+def test_universe_sync_prioritizes_key_symbols() -> None:
+    target = date(2026, 11, 6)
+    rows = [
+        ("AAA", None, None),
+        ("HPG", None, None),
+        ("FPT", None, None),
+    ]
+    assert choose_due_symbols(rows, target, batch_size=2, priority_symbols=["HPG", "FPT"]) == [
+        ("HPG", None), ("FPT", None),
+    ]
+
+
 def test_partial_provider_failures_checkpoint_only_successful_symbols():
     symbols = ["AAA", "BBB", "CCC"]
     completed = checkpointable_symbols(symbols, ["BBB"])

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "local-development-only-change-before-deploy"
     vnstock_api_key: str | None = None
     vnstock_symbols: str = "ALL"
+    vnstock_priority_symbols: str = "HPG,FPT,VCB,ACB,MBB,BID,SSI,VHM,VIC,VRE"
     vnstock_request_delay_seconds: float = Field(default=6.0, ge=0)
     provider_rpm: float = Field(default=60.0, gt=0)
 

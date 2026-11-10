@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import insert
 
+from core.config import settings
 from db.models import IndexBar, PriceBar, Symbol, UniverseSyncAttempt
 from db.session import AsyncSessionLocal
 from jobs.ingest_prices import ingest_price_history
@@ -13,11 +14,18 @@ from providers.factory import get_configured_market_source_id
 
 def choose_due_symbols(
     rows: list[tuple[str, date | None, date | None]], target: date, batch_size: int,
+    priority_symbols: list[str] | None = None,
 ) -> list[tuple[str, date | None]]:
-    """Prefer never fetched symbols, then the oldest stale bars; retry empty symbols on a new index date."""
+    """Prefer configured key symbols, then never-fetched and oldest stale bars."""
     due = [(symbol, latest) for symbol, latest, attempted_target in rows
            if (latest is None or latest < target) and attempted_target != target]
-    due.sort(key=lambda item: (item[1] is not None, item[1] or date.min, item[0]))
+    priority = {symbol.upper(): index for index, symbol in enumerate(priority_symbols or [])}
+    due.sort(key=lambda item: (
+        priority.get(item[0].upper(), len(priority)),
+        item[1] is not None,
+        item[1] or date.min,
+        item[0],
+    ))
     return due[:batch_size]
 
 
@@ -65,7 +73,12 @@ async def sync_universe_batch(batch_size: int = 50) -> dict[str, int | str | Non
             .group_by(Symbol.symbol, UniverseSyncAttempt.target_trade_date)
         )).all()
 
-    due = choose_due_symbols(rows, target, batch_size)
+    priority_symbols = [
+        symbol.strip().upper()
+        for symbol in settings.vnstock_priority_symbols.split(",")
+        if symbol.strip()
+    ]
+    due = choose_due_symbols(rows, target, batch_size, priority_symbols)
     if not due:
         return {"source": source, "target": target.isoformat(), "attempted": 0, "remaining": 0}
     symbols = [symbol for symbol, _ in due]
@@ -92,7 +105,7 @@ async def sync_universe_batch(batch_size: int = 50) -> dict[str, int | str | Non
                 set_={"target_trade_date": statement.excluded.target_trade_date,
                       "attempted_at": statement.excluded.attempted_at},
             ))
-    remaining = len(choose_due_symbols(rows, target, len(rows))) - len(completed_symbols)
+    remaining = len(choose_due_symbols(rows, target, len(rows), priority_symbols)) - len(completed_symbols)
     return {"source": source, "target": checkpoint_target.isoformat(), "attempted": len(due),
             "remaining": remaining, "bars": int(result["bars"]),
             "failed": int(result["failed_symbols"]), "empty": int(result["empty_symbols"]),
